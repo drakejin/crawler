@@ -8,7 +8,7 @@ import (
 )
 
 // need 전체 고루틴 개수 제어자
-//
+// recursive ㅇㅇㅇ
 
 type client struct {
 	currentRoutinesCount uint32
@@ -36,4 +36,5 @@ func New(startpoint string, currentRoutinesCount uint32, maximumConcurrency int)
 }
 
 func (c *client) crawler(ctx context.Context, url string) map[string]string {
+	return nil
 }
