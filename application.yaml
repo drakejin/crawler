@@ -1,0 +1,4 @@
+appName: crawler
+indexStorageDB:
+  dsn: user:passwd@tcp(localhost:23306)/indexer
+  timeout: 10s
