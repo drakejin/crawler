@@ -8,14 +8,18 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/drakejin/crawler/internal/storage/db/ent/pageinfo"
+	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 )
 
-// PageInfo is the model entity for the PageInfo schema.
-type PageInfo struct {
+// Page is the model entity for the Page schema.
+type Page struct {
 	config `json:"-"`
 	// ID of the ent.
-	ID int64 `json:"id,omitempty"`
+	ID string `json:"id,omitempty"`
+	// ReferredID holds the value of the "referred_id" field.
+	ReferredID string `json:"referred_id,omitempty"`
+	// CrawlingVersion holds the value of the "crawling_version" field.
+	CrawlingVersion string `json:"crawling_version,omitempty"`
 	// domain www.example.com
 	Domain string `json:"domain,omitempty"`
 	// port number
@@ -33,7 +37,7 @@ type PageInfo struct {
 	// how many times referred
 	CountReferred int64 `json:"count_referred,omitempty"`
 	// 해당 row는 쓸 수 있는지? 없는지?
-	Status pageinfo.Status `json:"status,omitempty"`
+	Status page.Status `json:"status,omitempty"`
 	// first indexed time
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// first indexed time by which system
@@ -96,438 +100,482 @@ type PageInfo struct {
 	OgVideoWidth string `json:"og_video_width,omitempty"`
 	// og meta tags 'video:height'
 	OgVideoHeight string `json:"og_video_height,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the PageQuery when eager-loading is set.
+	Edges PageEdges `json:"edges"`
+}
+
+// PageEdges holds the relations/edges for other nodes in the graph.
+type PageEdges struct {
+	// PageSource holds the value of the page_source edge.
+	PageSource []*PageSource `json:"page_source,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// PageSourceOrErr returns the PageSource value or an error if the edge
+// was not loaded in eager-loading.
+func (e PageEdges) PageSourceOrErr() ([]*PageSource, error) {
+	if e.loadedTypes[0] {
+		return e.PageSource, nil
+	}
+	return nil, &NotLoadedError{edge: "page_source"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
-func (*PageInfo) scanValues(columns []string) ([]any, error) {
+func (*Page) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case pageinfo.FieldIsHTTPS:
+		case page.FieldIsHTTPS:
 			values[i] = new(sql.NullBool)
-		case pageinfo.FieldID, pageinfo.FieldCountReferred:
+		case page.FieldCountReferred:
 			values[i] = new(sql.NullInt64)
-		case pageinfo.FieldDomain, pageinfo.FieldPort, pageinfo.FieldIndexedURL, pageinfo.FieldPath, pageinfo.FieldQuerystring, pageinfo.FieldURL, pageinfo.FieldStatus, pageinfo.FieldCreatedBy, pageinfo.FieldUpdatedBy, pageinfo.FieldTitle, pageinfo.FieldDescription, pageinfo.FieldKeywords, pageinfo.FieldContentLanguage, pageinfo.FieldTwitterCard, pageinfo.FieldTwitterURL, pageinfo.FieldTwitterTitle, pageinfo.FieldTwitterDescription, pageinfo.FieldTwitterImage, pageinfo.FieldOgSiteName, pageinfo.FieldOgLocale, pageinfo.FieldOgTitle, pageinfo.FieldOgDescription, pageinfo.FieldOgType, pageinfo.FieldOgURL, pageinfo.FieldOgImage, pageinfo.FieldOgImageType, pageinfo.FieldOgImageURL, pageinfo.FieldOgImageSecureURL, pageinfo.FieldOgImageWidth, pageinfo.FieldOgImageHeight, pageinfo.FieldOgVideo, pageinfo.FieldOgVideoType, pageinfo.FieldOgVideoURL, pageinfo.FieldOgVideoSecureURL, pageinfo.FieldOgVideoWidth, pageinfo.FieldOgVideoHeight:
+		case page.FieldID, page.FieldReferredID, page.FieldCrawlingVersion, page.FieldDomain, page.FieldPort, page.FieldIndexedURL, page.FieldPath, page.FieldQuerystring, page.FieldURL, page.FieldStatus, page.FieldCreatedBy, page.FieldUpdatedBy, page.FieldTitle, page.FieldDescription, page.FieldKeywords, page.FieldContentLanguage, page.FieldTwitterCard, page.FieldTwitterURL, page.FieldTwitterTitle, page.FieldTwitterDescription, page.FieldTwitterImage, page.FieldOgSiteName, page.FieldOgLocale, page.FieldOgTitle, page.FieldOgDescription, page.FieldOgType, page.FieldOgURL, page.FieldOgImage, page.FieldOgImageType, page.FieldOgImageURL, page.FieldOgImageSecureURL, page.FieldOgImageWidth, page.FieldOgImageHeight, page.FieldOgVideo, page.FieldOgVideoType, page.FieldOgVideoURL, page.FieldOgVideoSecureURL, page.FieldOgVideoWidth, page.FieldOgVideoHeight:
 			values[i] = new(sql.NullString)
-		case pageinfo.FieldCreatedAt, pageinfo.FieldUpdatedAt:
+		case page.FieldCreatedAt, page.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
-			return nil, fmt.Errorf("unexpected column %q for type PageInfo", columns[i])
+			return nil, fmt.Errorf("unexpected column %q for type Page", columns[i])
 		}
 	}
 	return values, nil
 }
 
 // assignValues assigns the values that were returned from sql.Rows (after scanning)
-// to the PageInfo fields.
-func (pi *PageInfo) assignValues(columns []string, values []any) error {
+// to the Page fields.
+func (pa *Page) assignValues(columns []string, values []any) error {
 	if m, n := len(values), len(columns); m < n {
 		return fmt.Errorf("mismatch number of scan values: %d != %d", m, n)
 	}
 	for i := range columns {
 		switch columns[i] {
-		case pageinfo.FieldID:
-			value, ok := values[i].(*sql.NullInt64)
-			if !ok {
-				return fmt.Errorf("unexpected type %T for field id", value)
+		case page.FieldID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field id", values[i])
+			} else if value.Valid {
+				pa.ID = value.String
 			}
-			pi.ID = int64(value.Int64)
-		case pageinfo.FieldDomain:
+		case page.FieldReferredID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field referred_id", values[i])
+			} else if value.Valid {
+				pa.ReferredID = value.String
+			}
+		case page.FieldCrawlingVersion:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field crawling_version", values[i])
+			} else if value.Valid {
+				pa.CrawlingVersion = value.String
+			}
+		case page.FieldDomain:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field domain", values[i])
 			} else if value.Valid {
-				pi.Domain = value.String
+				pa.Domain = value.String
 			}
-		case pageinfo.FieldPort:
+		case page.FieldPort:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field port", values[i])
 			} else if value.Valid {
-				pi.Port = value.String
+				pa.Port = value.String
 			}
-		case pageinfo.FieldIsHTTPS:
+		case page.FieldIsHTTPS:
 			if value, ok := values[i].(*sql.NullBool); !ok {
 				return fmt.Errorf("unexpected type %T for field is_https", values[i])
 			} else if value.Valid {
-				pi.IsHTTPS = value.Bool
+				pa.IsHTTPS = value.Bool
 			}
-		case pageinfo.FieldIndexedURL:
+		case page.FieldIndexedURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field indexed_url", values[i])
 			} else if value.Valid {
-				pi.IndexedURL = value.String
+				pa.IndexedURL = value.String
 			}
-		case pageinfo.FieldPath:
+		case page.FieldPath:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field path", values[i])
 			} else if value.Valid {
-				pi.Path = value.String
+				pa.Path = value.String
 			}
-		case pageinfo.FieldQuerystring:
+		case page.FieldQuerystring:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field querystring", values[i])
 			} else if value.Valid {
-				pi.Querystring = value.String
+				pa.Querystring = value.String
 			}
-		case pageinfo.FieldURL:
+		case page.FieldURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field url", values[i])
 			} else if value.Valid {
-				pi.URL = value.String
+				pa.URL = value.String
 			}
-		case pageinfo.FieldCountReferred:
+		case page.FieldCountReferred:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field count_referred", values[i])
 			} else if value.Valid {
-				pi.CountReferred = value.Int64
+				pa.CountReferred = value.Int64
 			}
-		case pageinfo.FieldStatus:
+		case page.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
-				pi.Status = pageinfo.Status(value.String)
+				pa.Status = page.Status(value.String)
 			}
-		case pageinfo.FieldCreatedAt:
+		case page.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
 			} else if value.Valid {
-				pi.CreatedAt = value.Time
+				pa.CreatedAt = value.Time
 			}
-		case pageinfo.FieldCreatedBy:
+		case page.FieldCreatedBy:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field created_by", values[i])
 			} else if value.Valid {
-				pi.CreatedBy = value.String
+				pa.CreatedBy = value.String
 			}
-		case pageinfo.FieldUpdatedAt:
+		case page.FieldUpdatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field updated_at", values[i])
 			} else if value.Valid {
-				pi.UpdatedAt = value.Time
+				pa.UpdatedAt = value.Time
 			}
-		case pageinfo.FieldUpdatedBy:
+		case page.FieldUpdatedBy:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field updated_by", values[i])
 			} else if value.Valid {
-				pi.UpdatedBy = value.String
+				pa.UpdatedBy = value.String
 			}
-		case pageinfo.FieldTitle:
+		case page.FieldTitle:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field title", values[i])
 			} else if value.Valid {
-				pi.Title = value.String
+				pa.Title = value.String
 			}
-		case pageinfo.FieldDescription:
+		case page.FieldDescription:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field description", values[i])
 			} else if value.Valid {
-				pi.Description = value.String
+				pa.Description = value.String
 			}
-		case pageinfo.FieldKeywords:
+		case page.FieldKeywords:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field keywords", values[i])
 			} else if value.Valid {
-				pi.Keywords = value.String
+				pa.Keywords = value.String
 			}
-		case pageinfo.FieldContentLanguage:
+		case page.FieldContentLanguage:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field content_language", values[i])
 			} else if value.Valid {
-				pi.ContentLanguage = value.String
+				pa.ContentLanguage = value.String
 			}
-		case pageinfo.FieldTwitterCard:
+		case page.FieldTwitterCard:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field twitter_card", values[i])
 			} else if value.Valid {
-				pi.TwitterCard = value.String
+				pa.TwitterCard = value.String
 			}
-		case pageinfo.FieldTwitterURL:
+		case page.FieldTwitterURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field twitter_url", values[i])
 			} else if value.Valid {
-				pi.TwitterURL = value.String
+				pa.TwitterURL = value.String
 			}
-		case pageinfo.FieldTwitterTitle:
+		case page.FieldTwitterTitle:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field twitter_title", values[i])
 			} else if value.Valid {
-				pi.TwitterTitle = value.String
+				pa.TwitterTitle = value.String
 			}
-		case pageinfo.FieldTwitterDescription:
+		case page.FieldTwitterDescription:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field twitter_description", values[i])
 			} else if value.Valid {
-				pi.TwitterDescription = value.String
+				pa.TwitterDescription = value.String
 			}
-		case pageinfo.FieldTwitterImage:
+		case page.FieldTwitterImage:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field twitter_image", values[i])
 			} else if value.Valid {
-				pi.TwitterImage = value.String
+				pa.TwitterImage = value.String
 			}
-		case pageinfo.FieldOgSiteName:
+		case page.FieldOgSiteName:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_site_name", values[i])
 			} else if value.Valid {
-				pi.OgSiteName = value.String
+				pa.OgSiteName = value.String
 			}
-		case pageinfo.FieldOgLocale:
+		case page.FieldOgLocale:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_locale", values[i])
 			} else if value.Valid {
-				pi.OgLocale = value.String
+				pa.OgLocale = value.String
 			}
-		case pageinfo.FieldOgTitle:
+		case page.FieldOgTitle:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_title", values[i])
 			} else if value.Valid {
-				pi.OgTitle = value.String
+				pa.OgTitle = value.String
 			}
-		case pageinfo.FieldOgDescription:
+		case page.FieldOgDescription:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_description", values[i])
 			} else if value.Valid {
-				pi.OgDescription = value.String
+				pa.OgDescription = value.String
 			}
-		case pageinfo.FieldOgType:
+		case page.FieldOgType:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_type", values[i])
 			} else if value.Valid {
-				pi.OgType = value.String
+				pa.OgType = value.String
 			}
-		case pageinfo.FieldOgURL:
+		case page.FieldOgURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_url", values[i])
 			} else if value.Valid {
-				pi.OgURL = value.String
+				pa.OgURL = value.String
 			}
-		case pageinfo.FieldOgImage:
+		case page.FieldOgImage:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_image", values[i])
 			} else if value.Valid {
-				pi.OgImage = value.String
+				pa.OgImage = value.String
 			}
-		case pageinfo.FieldOgImageType:
+		case page.FieldOgImageType:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_image_type", values[i])
 			} else if value.Valid {
-				pi.OgImageType = value.String
+				pa.OgImageType = value.String
 			}
-		case pageinfo.FieldOgImageURL:
+		case page.FieldOgImageURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_image_url", values[i])
 			} else if value.Valid {
-				pi.OgImageURL = value.String
+				pa.OgImageURL = value.String
 			}
-		case pageinfo.FieldOgImageSecureURL:
+		case page.FieldOgImageSecureURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_image_secure_url", values[i])
 			} else if value.Valid {
-				pi.OgImageSecureURL = value.String
+				pa.OgImageSecureURL = value.String
 			}
-		case pageinfo.FieldOgImageWidth:
+		case page.FieldOgImageWidth:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_image_width", values[i])
 			} else if value.Valid {
-				pi.OgImageWidth = value.String
+				pa.OgImageWidth = value.String
 			}
-		case pageinfo.FieldOgImageHeight:
+		case page.FieldOgImageHeight:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_image_height", values[i])
 			} else if value.Valid {
-				pi.OgImageHeight = value.String
+				pa.OgImageHeight = value.String
 			}
-		case pageinfo.FieldOgVideo:
+		case page.FieldOgVideo:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_video", values[i])
 			} else if value.Valid {
-				pi.OgVideo = value.String
+				pa.OgVideo = value.String
 			}
-		case pageinfo.FieldOgVideoType:
+		case page.FieldOgVideoType:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_video_type", values[i])
 			} else if value.Valid {
-				pi.OgVideoType = value.String
+				pa.OgVideoType = value.String
 			}
-		case pageinfo.FieldOgVideoURL:
+		case page.FieldOgVideoURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_video_url", values[i])
 			} else if value.Valid {
-				pi.OgVideoURL = value.String
+				pa.OgVideoURL = value.String
 			}
-		case pageinfo.FieldOgVideoSecureURL:
+		case page.FieldOgVideoSecureURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_video_secure_url", values[i])
 			} else if value.Valid {
-				pi.OgVideoSecureURL = value.String
+				pa.OgVideoSecureURL = value.String
 			}
-		case pageinfo.FieldOgVideoWidth:
+		case page.FieldOgVideoWidth:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_video_width", values[i])
 			} else if value.Valid {
-				pi.OgVideoWidth = value.String
+				pa.OgVideoWidth = value.String
 			}
-		case pageinfo.FieldOgVideoHeight:
+		case page.FieldOgVideoHeight:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field og_video_height", values[i])
 			} else if value.Valid {
-				pi.OgVideoHeight = value.String
+				pa.OgVideoHeight = value.String
 			}
 		}
 	}
 	return nil
 }
 
-// Update returns a builder for updating this PageInfo.
-// Note that you need to call PageInfo.Unwrap() before calling this method if this PageInfo
-// was returned from a transaction, and the transaction was committed or rolled back.
-func (pi *PageInfo) Update() *PageInfoUpdateOne {
-	return (&PageInfoClient{config: pi.config}).UpdateOne(pi)
+// QueryPageSource queries the "page_source" edge of the Page entity.
+func (pa *Page) QueryPageSource() *PageSourceQuery {
+	return (&PageClient{config: pa.config}).QueryPageSource(pa)
 }
 
-// Unwrap unwraps the PageInfo entity that was returned from a transaction after it was closed,
+// Update returns a builder for updating this Page.
+// Note that you need to call Page.Unwrap() before calling this method if this Page
+// was returned from a transaction, and the transaction was committed or rolled back.
+func (pa *Page) Update() *PageUpdateOne {
+	return (&PageClient{config: pa.config}).UpdateOne(pa)
+}
+
+// Unwrap unwraps the Page entity that was returned from a transaction after it was closed,
 // so that all future queries will be executed through the driver which created the transaction.
-func (pi *PageInfo) Unwrap() *PageInfo {
-	_tx, ok := pi.config.driver.(*txDriver)
+func (pa *Page) Unwrap() *Page {
+	_tx, ok := pa.config.driver.(*txDriver)
 	if !ok {
-		panic("ent: PageInfo is not a transactional entity")
+		panic("ent: Page is not a transactional entity")
 	}
-	pi.config.driver = _tx.drv
-	return pi
+	pa.config.driver = _tx.drv
+	return pa
 }
 
 // String implements the fmt.Stringer.
-func (pi *PageInfo) String() string {
+func (pa *Page) String() string {
 	var builder strings.Builder
-	builder.WriteString("PageInfo(")
-	builder.WriteString(fmt.Sprintf("id=%v, ", pi.ID))
+	builder.WriteString("Page(")
+	builder.WriteString(fmt.Sprintf("id=%v, ", pa.ID))
+	builder.WriteString("referred_id=")
+	builder.WriteString(pa.ReferredID)
+	builder.WriteString(", ")
+	builder.WriteString("crawling_version=")
+	builder.WriteString(pa.CrawlingVersion)
+	builder.WriteString(", ")
 	builder.WriteString("domain=")
-	builder.WriteString(pi.Domain)
+	builder.WriteString(pa.Domain)
 	builder.WriteString(", ")
 	builder.WriteString("port=")
-	builder.WriteString(pi.Port)
+	builder.WriteString(pa.Port)
 	builder.WriteString(", ")
 	builder.WriteString("is_https=")
-	builder.WriteString(fmt.Sprintf("%v", pi.IsHTTPS))
+	builder.WriteString(fmt.Sprintf("%v", pa.IsHTTPS))
 	builder.WriteString(", ")
 	builder.WriteString("indexed_url=")
-	builder.WriteString(pi.IndexedURL)
+	builder.WriteString(pa.IndexedURL)
 	builder.WriteString(", ")
 	builder.WriteString("path=")
-	builder.WriteString(pi.Path)
+	builder.WriteString(pa.Path)
 	builder.WriteString(", ")
 	builder.WriteString("querystring=")
-	builder.WriteString(pi.Querystring)
+	builder.WriteString(pa.Querystring)
 	builder.WriteString(", ")
 	builder.WriteString("url=")
-	builder.WriteString(pi.URL)
+	builder.WriteString(pa.URL)
 	builder.WriteString(", ")
 	builder.WriteString("count_referred=")
-	builder.WriteString(fmt.Sprintf("%v", pi.CountReferred))
+	builder.WriteString(fmt.Sprintf("%v", pa.CountReferred))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
-	builder.WriteString(fmt.Sprintf("%v", pi.Status))
+	builder.WriteString(fmt.Sprintf("%v", pa.Status))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
-	builder.WriteString(pi.CreatedAt.Format(time.ANSIC))
+	builder.WriteString(pa.CreatedAt.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("created_by=")
-	builder.WriteString(pi.CreatedBy)
+	builder.WriteString(pa.CreatedBy)
 	builder.WriteString(", ")
 	builder.WriteString("updated_at=")
-	builder.WriteString(pi.UpdatedAt.Format(time.ANSIC))
+	builder.WriteString(pa.UpdatedAt.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("updated_by=")
-	builder.WriteString(pi.UpdatedBy)
+	builder.WriteString(pa.UpdatedBy)
 	builder.WriteString(", ")
 	builder.WriteString("title=")
-	builder.WriteString(pi.Title)
+	builder.WriteString(pa.Title)
 	builder.WriteString(", ")
 	builder.WriteString("description=")
-	builder.WriteString(pi.Description)
+	builder.WriteString(pa.Description)
 	builder.WriteString(", ")
 	builder.WriteString("keywords=")
-	builder.WriteString(pi.Keywords)
+	builder.WriteString(pa.Keywords)
 	builder.WriteString(", ")
 	builder.WriteString("content_language=")
-	builder.WriteString(pi.ContentLanguage)
+	builder.WriteString(pa.ContentLanguage)
 	builder.WriteString(", ")
 	builder.WriteString("twitter_card=")
-	builder.WriteString(pi.TwitterCard)
+	builder.WriteString(pa.TwitterCard)
 	builder.WriteString(", ")
 	builder.WriteString("twitter_url=")
-	builder.WriteString(pi.TwitterURL)
+	builder.WriteString(pa.TwitterURL)
 	builder.WriteString(", ")
 	builder.WriteString("twitter_title=")
-	builder.WriteString(pi.TwitterTitle)
+	builder.WriteString(pa.TwitterTitle)
 	builder.WriteString(", ")
 	builder.WriteString("twitter_description=")
-	builder.WriteString(pi.TwitterDescription)
+	builder.WriteString(pa.TwitterDescription)
 	builder.WriteString(", ")
 	builder.WriteString("twitter_image=")
-	builder.WriteString(pi.TwitterImage)
+	builder.WriteString(pa.TwitterImage)
 	builder.WriteString(", ")
 	builder.WriteString("og_site_name=")
-	builder.WriteString(pi.OgSiteName)
+	builder.WriteString(pa.OgSiteName)
 	builder.WriteString(", ")
 	builder.WriteString("og_locale=")
-	builder.WriteString(pi.OgLocale)
+	builder.WriteString(pa.OgLocale)
 	builder.WriteString(", ")
 	builder.WriteString("og_title=")
-	builder.WriteString(pi.OgTitle)
+	builder.WriteString(pa.OgTitle)
 	builder.WriteString(", ")
 	builder.WriteString("og_description=")
-	builder.WriteString(pi.OgDescription)
+	builder.WriteString(pa.OgDescription)
 	builder.WriteString(", ")
 	builder.WriteString("og_type=")
-	builder.WriteString(pi.OgType)
+	builder.WriteString(pa.OgType)
 	builder.WriteString(", ")
 	builder.WriteString("og_url=")
-	builder.WriteString(pi.OgURL)
+	builder.WriteString(pa.OgURL)
 	builder.WriteString(", ")
 	builder.WriteString("og_image=")
-	builder.WriteString(pi.OgImage)
+	builder.WriteString(pa.OgImage)
 	builder.WriteString(", ")
 	builder.WriteString("og_image_type=")
-	builder.WriteString(pi.OgImageType)
+	builder.WriteString(pa.OgImageType)
 	builder.WriteString(", ")
 	builder.WriteString("og_image_url=")
-	builder.WriteString(pi.OgImageURL)
+	builder.WriteString(pa.OgImageURL)
 	builder.WriteString(", ")
 	builder.WriteString("og_image_secure_url=")
-	builder.WriteString(pi.OgImageSecureURL)
+	builder.WriteString(pa.OgImageSecureURL)
 	builder.WriteString(", ")
 	builder.WriteString("og_image_width=")
-	builder.WriteString(pi.OgImageWidth)
+	builder.WriteString(pa.OgImageWidth)
 	builder.WriteString(", ")
 	builder.WriteString("og_image_height=")
-	builder.WriteString(pi.OgImageHeight)
+	builder.WriteString(pa.OgImageHeight)
 	builder.WriteString(", ")
 	builder.WriteString("og_video=")
-	builder.WriteString(pi.OgVideo)
+	builder.WriteString(pa.OgVideo)
 	builder.WriteString(", ")
 	builder.WriteString("og_video_type=")
-	builder.WriteString(pi.OgVideoType)
+	builder.WriteString(pa.OgVideoType)
 	builder.WriteString(", ")
 	builder.WriteString("og_video_url=")
-	builder.WriteString(pi.OgVideoURL)
+	builder.WriteString(pa.OgVideoURL)
 	builder.WriteString(", ")
 	builder.WriteString("og_video_secure_url=")
-	builder.WriteString(pi.OgVideoSecureURL)
+	builder.WriteString(pa.OgVideoSecureURL)
 	builder.WriteString(", ")
 	builder.WriteString("og_video_width=")
-	builder.WriteString(pi.OgVideoWidth)
+	builder.WriteString(pa.OgVideoWidth)
 	builder.WriteString(", ")
 	builder.WriteString("og_video_height=")
-	builder.WriteString(pi.OgVideoHeight)
+	builder.WriteString(pa.OgVideoHeight)
 	builder.WriteByte(')')
 	return builder.String()
 }
 
-// PageInfos is a parsable slice of PageInfo.
-type PageInfos []*PageInfo
+// Pages is a parsable slice of Page.
+type Pages []*Page
 
-func (pi PageInfos) config(cfg config) {
-	for _i := range pi {
-		pi[_i].config = cfg
+func (pa Pages) config(cfg config) {
+	for _i := range pa {
+		pa[_i].config = cfg
 	}
 }

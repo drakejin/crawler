@@ -1,8 +1,16 @@
 package schema
 
 import (
-	"github.com/drakejin/crawler/internal/storage/db/ent/validate"
+	"context"
 	"time"
+
+	"entgo.io/ent/schema/edge"
+	"entgo.io/ent/schema/index"
+	"github.com/google/uuid"
+
+	myent "github.com/drakejin/crawler/internal/storage/db/ent"
+	"github.com/drakejin/crawler/internal/storage/db/ent/hook"
+	"github.com/drakejin/crawler/internal/storage/db/ent/validate"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -11,15 +19,18 @@ import (
 	"entgo.io/ent/schema/field"
 )
 
-// PageInfo holds the schema definition for the Keyword entity.
-type PageInfo struct {
+// Page holds the schema definition for the Keyword entity.
+type Page struct {
 	ent.Schema
 }
 
-// Fields of the Word.
-func (PageInfo) Fields() []ent.Field {
+// Fields of the Page.
+func (Page) Fields() []ent.Field {
 	return []ent.Field{
-		field.Int64("id").Unique(),
+		field.String("id").Unique(),
+		field.String("referred_id"),
+
+		field.String("crawling_version"),
 
 		field.String("domain").
 			Annotations(entsql.Annotation{
@@ -227,23 +238,43 @@ func (PageInfo) Fields() []ent.Field {
 	}
 }
 
-// Edges of the Word.
-func (PageInfo) Edges() []ent.Edge {
-	return []ent.Edge{
-		//edge.To("page_link", PageLink.Type),
+// Hooks of the Page.
+func (Page) Hooks() []ent.Hook {
+	return []ent.Hook{
+		// First hook.
+		hook.On(
+			func(next ent.Mutator) ent.Mutator {
+				return hook.PageFunc(func(ctx context.Context, m *myent.PageMutation) (ent.Value, error) {
+					m.SetID(uuid.NewString())
+					return next.Mutate(ctx, m)
+				})
+			},
+			// Limit the hook only for these operations.
+			ent.OpCreate,
+		),
 	}
 }
 
-// Indexes of the Word
-func (PageInfo) Indexes() []ent.Index {
-	return []ent.Index{}
+// Edges of the Page.
+func (Page) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("page_source", PageSource.Type),
+	}
 }
 
-// Annotations of the Word.
-func (PageInfo) Annotations() []schema.Annotation {
+// Indexes of the Page
+func (Page) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("crawling_version"),
+		index.Fields("referred_id"),
+	}
+}
+
+// Annotations of the Page.
+func (Page) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
-			Table:     "page_info",
+			Table:     "page",
 			Charset:   "utf8mb4",
 			Collation: "utf8mb4_0900_ai_ci",
 		},

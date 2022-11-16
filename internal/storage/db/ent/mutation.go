@@ -9,8 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/drakejin/crawler/internal/storage/db/ent/pageinfo"
+	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagelink"
+	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 	"github.com/drakejin/crawler/internal/storage/db/ent/predicate"
 
 	"entgo.io/ent"
@@ -25,16 +26,19 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypePageInfo = "PageInfo"
-	TypePageLink = "PageLink"
+	TypePage       = "Page"
+	TypePageLink   = "PageLink"
+	TypePageSource = "PageSource"
 )
 
-// PageInfoMutation represents an operation that mutates the PageInfo nodes in the graph.
-type PageInfoMutation struct {
+// PageMutation represents an operation that mutates the Page nodes in the graph.
+type PageMutation struct {
 	config
 	op                  Op
 	typ                 string
-	id                  *int64
+	id                  *string
+	referred_id         *string
+	crawling_version    *string
 	domain              *string
 	port                *string
 	is_https            *bool
@@ -44,7 +48,7 @@ type PageInfoMutation struct {
 	url                 *string
 	count_referred      *int64
 	addcount_referred   *int64
-	status              *pageinfo.Status
+	status              *page.Status
 	created_at          *time.Time
 	created_by          *string
 	updated_at          *time.Time
@@ -77,22 +81,25 @@ type PageInfoMutation struct {
 	og_video_width      *string
 	og_video_height     *string
 	clearedFields       map[string]struct{}
+	page_source         map[string]struct{}
+	removedpage_source  map[string]struct{}
+	clearedpage_source  bool
 	done                bool
-	oldValue            func(context.Context) (*PageInfo, error)
-	predicates          []predicate.PageInfo
+	oldValue            func(context.Context) (*Page, error)
+	predicates          []predicate.Page
 }
 
-var _ ent.Mutation = (*PageInfoMutation)(nil)
+var _ ent.Mutation = (*PageMutation)(nil)
 
-// pageinfoOption allows management of the mutation configuration using functional options.
-type pageinfoOption func(*PageInfoMutation)
+// pageOption allows management of the mutation configuration using functional options.
+type pageOption func(*PageMutation)
 
-// newPageInfoMutation creates new mutation for the PageInfo entity.
-func newPageInfoMutation(c config, op Op, opts ...pageinfoOption) *PageInfoMutation {
-	m := &PageInfoMutation{
+// newPageMutation creates new mutation for the Page entity.
+func newPageMutation(c config, op Op, opts ...pageOption) *PageMutation {
+	m := &PageMutation{
 		config:        c,
 		op:            op,
-		typ:           TypePageInfo,
+		typ:           TypePage,
 		clearedFields: make(map[string]struct{}),
 	}
 	for _, opt := range opts {
@@ -101,20 +108,20 @@ func newPageInfoMutation(c config, op Op, opts ...pageinfoOption) *PageInfoMutat
 	return m
 }
 
-// withPageInfoID sets the ID field of the mutation.
-func withPageInfoID(id int64) pageinfoOption {
-	return func(m *PageInfoMutation) {
+// withPageID sets the ID field of the mutation.
+func withPageID(id string) pageOption {
+	return func(m *PageMutation) {
 		var (
 			err   error
 			once  sync.Once
-			value *PageInfo
+			value *Page
 		)
-		m.oldValue = func(ctx context.Context) (*PageInfo, error) {
+		m.oldValue = func(ctx context.Context) (*Page, error) {
 			once.Do(func() {
 				if m.done {
 					err = errors.New("querying old values post mutation is not allowed")
 				} else {
-					value, err = m.Client().PageInfo.Get(ctx, id)
+					value, err = m.Client().Page.Get(ctx, id)
 				}
 			})
 			return value, err
@@ -123,10 +130,10 @@ func withPageInfoID(id int64) pageinfoOption {
 	}
 }
 
-// withPageInfo sets the old PageInfo of the mutation.
-func withPageInfo(node *PageInfo) pageinfoOption {
-	return func(m *PageInfoMutation) {
-		m.oldValue = func(context.Context) (*PageInfo, error) {
+// withPage sets the old Page of the mutation.
+func withPage(node *Page) pageOption {
+	return func(m *PageMutation) {
+		m.oldValue = func(context.Context) (*Page, error) {
 			return node, nil
 		}
 		m.id = &node.ID
@@ -135,7 +142,7 @@ func withPageInfo(node *PageInfo) pageinfoOption {
 
 // Client returns a new `ent.Client` from the mutation. If the mutation was
 // executed in a transaction (ent.Tx), a transactional client is returned.
-func (m PageInfoMutation) Client() *Client {
+func (m PageMutation) Client() *Client {
 	client := &Client{config: m.config}
 	client.init()
 	return client
@@ -143,7 +150,7 @@ func (m PageInfoMutation) Client() *Client {
 
 // Tx returns an `ent.Tx` for mutations that were executed in transactions;
 // it returns an error otherwise.
-func (m PageInfoMutation) Tx() (*Tx, error) {
+func (m PageMutation) Tx() (*Tx, error) {
 	if _, ok := m.driver.(*txDriver); !ok {
 		return nil, errors.New("ent: mutation is not running in a transaction")
 	}
@@ -153,14 +160,14 @@ func (m PageInfoMutation) Tx() (*Tx, error) {
 }
 
 // SetID sets the value of the id field. Note that this
-// operation is only accepted on creation of PageInfo entities.
-func (m *PageInfoMutation) SetID(id int64) {
+// operation is only accepted on creation of Page entities.
+func (m *PageMutation) SetID(id string) {
 	m.id = &id
 }
 
 // ID returns the ID value in the mutation. Note that the ID is only available
 // if it was provided to the builder or after it was returned from the database.
-func (m *PageInfoMutation) ID() (id int64, exists bool) {
+func (m *PageMutation) ID() (id string, exists bool) {
 	if m.id == nil {
 		return
 	}
@@ -171,28 +178,100 @@ func (m *PageInfoMutation) ID() (id int64, exists bool) {
 // That means, if the mutation is applied within a transaction with an isolation level such
 // as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
 // or updated by the mutation.
-func (m *PageInfoMutation) IDs(ctx context.Context) ([]int64, error) {
+func (m *PageMutation) IDs(ctx context.Context) ([]string, error) {
 	switch {
 	case m.op.Is(OpUpdateOne | OpDeleteOne):
 		id, exists := m.ID()
 		if exists {
-			return []int64{id}, nil
+			return []string{id}, nil
 		}
 		fallthrough
 	case m.op.Is(OpUpdate | OpDelete):
-		return m.Client().PageInfo.Query().Where(m.predicates...).IDs(ctx)
+		return m.Client().Page.Query().Where(m.predicates...).IDs(ctx)
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
 }
 
+// SetReferredID sets the "referred_id" field.
+func (m *PageMutation) SetReferredID(s string) {
+	m.referred_id = &s
+}
+
+// ReferredID returns the value of the "referred_id" field in the mutation.
+func (m *PageMutation) ReferredID() (r string, exists bool) {
+	v := m.referred_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferredID returns the old "referred_id" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PageMutation) OldReferredID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferredID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferredID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferredID: %w", err)
+	}
+	return oldValue.ReferredID, nil
+}
+
+// ResetReferredID resets all changes to the "referred_id" field.
+func (m *PageMutation) ResetReferredID() {
+	m.referred_id = nil
+}
+
+// SetCrawlingVersion sets the "crawling_version" field.
+func (m *PageMutation) SetCrawlingVersion(s string) {
+	m.crawling_version = &s
+}
+
+// CrawlingVersion returns the value of the "crawling_version" field in the mutation.
+func (m *PageMutation) CrawlingVersion() (r string, exists bool) {
+	v := m.crawling_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCrawlingVersion returns the old "crawling_version" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PageMutation) OldCrawlingVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCrawlingVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCrawlingVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCrawlingVersion: %w", err)
+	}
+	return oldValue.CrawlingVersion, nil
+}
+
+// ResetCrawlingVersion resets all changes to the "crawling_version" field.
+func (m *PageMutation) ResetCrawlingVersion() {
+	m.crawling_version = nil
+}
+
 // SetDomain sets the "domain" field.
-func (m *PageInfoMutation) SetDomain(s string) {
+func (m *PageMutation) SetDomain(s string) {
 	m.domain = &s
 }
 
 // Domain returns the value of the "domain" field in the mutation.
-func (m *PageInfoMutation) Domain() (r string, exists bool) {
+func (m *PageMutation) Domain() (r string, exists bool) {
 	v := m.domain
 	if v == nil {
 		return
@@ -200,10 +279,10 @@ func (m *PageInfoMutation) Domain() (r string, exists bool) {
 	return *v, true
 }
 
-// OldDomain returns the old "domain" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldDomain returns the old "domain" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldDomain(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldDomain(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldDomain is only allowed on UpdateOne operations")
 	}
@@ -218,17 +297,17 @@ func (m *PageInfoMutation) OldDomain(ctx context.Context) (v string, err error) 
 }
 
 // ResetDomain resets all changes to the "domain" field.
-func (m *PageInfoMutation) ResetDomain() {
+func (m *PageMutation) ResetDomain() {
 	m.domain = nil
 }
 
 // SetPort sets the "port" field.
-func (m *PageInfoMutation) SetPort(s string) {
+func (m *PageMutation) SetPort(s string) {
 	m.port = &s
 }
 
 // Port returns the value of the "port" field in the mutation.
-func (m *PageInfoMutation) Port() (r string, exists bool) {
+func (m *PageMutation) Port() (r string, exists bool) {
 	v := m.port
 	if v == nil {
 		return
@@ -236,10 +315,10 @@ func (m *PageInfoMutation) Port() (r string, exists bool) {
 	return *v, true
 }
 
-// OldPort returns the old "port" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldPort returns the old "port" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldPort(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldPort(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldPort is only allowed on UpdateOne operations")
 	}
@@ -254,17 +333,17 @@ func (m *PageInfoMutation) OldPort(ctx context.Context) (v string, err error) {
 }
 
 // ResetPort resets all changes to the "port" field.
-func (m *PageInfoMutation) ResetPort() {
+func (m *PageMutation) ResetPort() {
 	m.port = nil
 }
 
 // SetIsHTTPS sets the "is_https" field.
-func (m *PageInfoMutation) SetIsHTTPS(b bool) {
+func (m *PageMutation) SetIsHTTPS(b bool) {
 	m.is_https = &b
 }
 
 // IsHTTPS returns the value of the "is_https" field in the mutation.
-func (m *PageInfoMutation) IsHTTPS() (r bool, exists bool) {
+func (m *PageMutation) IsHTTPS() (r bool, exists bool) {
 	v := m.is_https
 	if v == nil {
 		return
@@ -272,10 +351,10 @@ func (m *PageInfoMutation) IsHTTPS() (r bool, exists bool) {
 	return *v, true
 }
 
-// OldIsHTTPS returns the old "is_https" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldIsHTTPS returns the old "is_https" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldIsHTTPS(ctx context.Context) (v bool, err error) {
+func (m *PageMutation) OldIsHTTPS(ctx context.Context) (v bool, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldIsHTTPS is only allowed on UpdateOne operations")
 	}
@@ -290,17 +369,17 @@ func (m *PageInfoMutation) OldIsHTTPS(ctx context.Context) (v bool, err error) {
 }
 
 // ResetIsHTTPS resets all changes to the "is_https" field.
-func (m *PageInfoMutation) ResetIsHTTPS() {
+func (m *PageMutation) ResetIsHTTPS() {
 	m.is_https = nil
 }
 
 // SetIndexedURL sets the "indexed_url" field.
-func (m *PageInfoMutation) SetIndexedURL(s string) {
+func (m *PageMutation) SetIndexedURL(s string) {
 	m.indexed_url = &s
 }
 
 // IndexedURL returns the value of the "indexed_url" field in the mutation.
-func (m *PageInfoMutation) IndexedURL() (r string, exists bool) {
+func (m *PageMutation) IndexedURL() (r string, exists bool) {
 	v := m.indexed_url
 	if v == nil {
 		return
@@ -308,10 +387,10 @@ func (m *PageInfoMutation) IndexedURL() (r string, exists bool) {
 	return *v, true
 }
 
-// OldIndexedURL returns the old "indexed_url" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldIndexedURL returns the old "indexed_url" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldIndexedURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldIndexedURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldIndexedURL is only allowed on UpdateOne operations")
 	}
@@ -326,17 +405,17 @@ func (m *PageInfoMutation) OldIndexedURL(ctx context.Context) (v string, err err
 }
 
 // ResetIndexedURL resets all changes to the "indexed_url" field.
-func (m *PageInfoMutation) ResetIndexedURL() {
+func (m *PageMutation) ResetIndexedURL() {
 	m.indexed_url = nil
 }
 
 // SetPath sets the "path" field.
-func (m *PageInfoMutation) SetPath(s string) {
+func (m *PageMutation) SetPath(s string) {
 	m._path = &s
 }
 
 // Path returns the value of the "path" field in the mutation.
-func (m *PageInfoMutation) Path() (r string, exists bool) {
+func (m *PageMutation) Path() (r string, exists bool) {
 	v := m._path
 	if v == nil {
 		return
@@ -344,10 +423,10 @@ func (m *PageInfoMutation) Path() (r string, exists bool) {
 	return *v, true
 }
 
-// OldPath returns the old "path" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldPath returns the old "path" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldPath(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldPath(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldPath is only allowed on UpdateOne operations")
 	}
@@ -362,17 +441,17 @@ func (m *PageInfoMutation) OldPath(ctx context.Context) (v string, err error) {
 }
 
 // ResetPath resets all changes to the "path" field.
-func (m *PageInfoMutation) ResetPath() {
+func (m *PageMutation) ResetPath() {
 	m._path = nil
 }
 
 // SetQuerystring sets the "querystring" field.
-func (m *PageInfoMutation) SetQuerystring(s string) {
+func (m *PageMutation) SetQuerystring(s string) {
 	m.querystring = &s
 }
 
 // Querystring returns the value of the "querystring" field in the mutation.
-func (m *PageInfoMutation) Querystring() (r string, exists bool) {
+func (m *PageMutation) Querystring() (r string, exists bool) {
 	v := m.querystring
 	if v == nil {
 		return
@@ -380,10 +459,10 @@ func (m *PageInfoMutation) Querystring() (r string, exists bool) {
 	return *v, true
 }
 
-// OldQuerystring returns the old "querystring" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldQuerystring returns the old "querystring" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldQuerystring(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldQuerystring(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldQuerystring is only allowed on UpdateOne operations")
 	}
@@ -398,17 +477,17 @@ func (m *PageInfoMutation) OldQuerystring(ctx context.Context) (v string, err er
 }
 
 // ResetQuerystring resets all changes to the "querystring" field.
-func (m *PageInfoMutation) ResetQuerystring() {
+func (m *PageMutation) ResetQuerystring() {
 	m.querystring = nil
 }
 
 // SetURL sets the "url" field.
-func (m *PageInfoMutation) SetURL(s string) {
+func (m *PageMutation) SetURL(s string) {
 	m.url = &s
 }
 
 // URL returns the value of the "url" field in the mutation.
-func (m *PageInfoMutation) URL() (r string, exists bool) {
+func (m *PageMutation) URL() (r string, exists bool) {
 	v := m.url
 	if v == nil {
 		return
@@ -416,10 +495,10 @@ func (m *PageInfoMutation) URL() (r string, exists bool) {
 	return *v, true
 }
 
-// OldURL returns the old "url" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldURL returns the old "url" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldURL is only allowed on UpdateOne operations")
 	}
@@ -434,18 +513,18 @@ func (m *PageInfoMutation) OldURL(ctx context.Context) (v string, err error) {
 }
 
 // ResetURL resets all changes to the "url" field.
-func (m *PageInfoMutation) ResetURL() {
+func (m *PageMutation) ResetURL() {
 	m.url = nil
 }
 
 // SetCountReferred sets the "count_referred" field.
-func (m *PageInfoMutation) SetCountReferred(i int64) {
+func (m *PageMutation) SetCountReferred(i int64) {
 	m.count_referred = &i
 	m.addcount_referred = nil
 }
 
 // CountReferred returns the value of the "count_referred" field in the mutation.
-func (m *PageInfoMutation) CountReferred() (r int64, exists bool) {
+func (m *PageMutation) CountReferred() (r int64, exists bool) {
 	v := m.count_referred
 	if v == nil {
 		return
@@ -453,10 +532,10 @@ func (m *PageInfoMutation) CountReferred() (r int64, exists bool) {
 	return *v, true
 }
 
-// OldCountReferred returns the old "count_referred" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldCountReferred returns the old "count_referred" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldCountReferred(ctx context.Context) (v int64, err error) {
+func (m *PageMutation) OldCountReferred(ctx context.Context) (v int64, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCountReferred is only allowed on UpdateOne operations")
 	}
@@ -471,7 +550,7 @@ func (m *PageInfoMutation) OldCountReferred(ctx context.Context) (v int64, err e
 }
 
 // AddCountReferred adds i to the "count_referred" field.
-func (m *PageInfoMutation) AddCountReferred(i int64) {
+func (m *PageMutation) AddCountReferred(i int64) {
 	if m.addcount_referred != nil {
 		*m.addcount_referred += i
 	} else {
@@ -480,7 +559,7 @@ func (m *PageInfoMutation) AddCountReferred(i int64) {
 }
 
 // AddedCountReferred returns the value that was added to the "count_referred" field in this mutation.
-func (m *PageInfoMutation) AddedCountReferred() (r int64, exists bool) {
+func (m *PageMutation) AddedCountReferred() (r int64, exists bool) {
 	v := m.addcount_referred
 	if v == nil {
 		return
@@ -489,18 +568,18 @@ func (m *PageInfoMutation) AddedCountReferred() (r int64, exists bool) {
 }
 
 // ResetCountReferred resets all changes to the "count_referred" field.
-func (m *PageInfoMutation) ResetCountReferred() {
+func (m *PageMutation) ResetCountReferred() {
 	m.count_referred = nil
 	m.addcount_referred = nil
 }
 
 // SetStatus sets the "status" field.
-func (m *PageInfoMutation) SetStatus(pa pageinfo.Status) {
+func (m *PageMutation) SetStatus(pa page.Status) {
 	m.status = &pa
 }
 
 // Status returns the value of the "status" field in the mutation.
-func (m *PageInfoMutation) Status() (r pageinfo.Status, exists bool) {
+func (m *PageMutation) Status() (r page.Status, exists bool) {
 	v := m.status
 	if v == nil {
 		return
@@ -508,10 +587,10 @@ func (m *PageInfoMutation) Status() (r pageinfo.Status, exists bool) {
 	return *v, true
 }
 
-// OldStatus returns the old "status" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldStatus returns the old "status" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldStatus(ctx context.Context) (v pageinfo.Status, err error) {
+func (m *PageMutation) OldStatus(ctx context.Context) (v page.Status, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
 	}
@@ -526,17 +605,17 @@ func (m *PageInfoMutation) OldStatus(ctx context.Context) (v pageinfo.Status, er
 }
 
 // ResetStatus resets all changes to the "status" field.
-func (m *PageInfoMutation) ResetStatus() {
+func (m *PageMutation) ResetStatus() {
 	m.status = nil
 }
 
 // SetCreatedAt sets the "created_at" field.
-func (m *PageInfoMutation) SetCreatedAt(t time.Time) {
+func (m *PageMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
 }
 
 // CreatedAt returns the value of the "created_at" field in the mutation.
-func (m *PageInfoMutation) CreatedAt() (r time.Time, exists bool) {
+func (m *PageMutation) CreatedAt() (r time.Time, exists bool) {
 	v := m.created_at
 	if v == nil {
 		return
@@ -544,10 +623,10 @@ func (m *PageInfoMutation) CreatedAt() (r time.Time, exists bool) {
 	return *v, true
 }
 
-// OldCreatedAt returns the old "created_at" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldCreatedAt returns the old "created_at" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+func (m *PageMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
 	}
@@ -562,17 +641,17 @@ func (m *PageInfoMutation) OldCreatedAt(ctx context.Context) (v time.Time, err e
 }
 
 // ResetCreatedAt resets all changes to the "created_at" field.
-func (m *PageInfoMutation) ResetCreatedAt() {
+func (m *PageMutation) ResetCreatedAt() {
 	m.created_at = nil
 }
 
 // SetCreatedBy sets the "created_by" field.
-func (m *PageInfoMutation) SetCreatedBy(s string) {
+func (m *PageMutation) SetCreatedBy(s string) {
 	m.created_by = &s
 }
 
 // CreatedBy returns the value of the "created_by" field in the mutation.
-func (m *PageInfoMutation) CreatedBy() (r string, exists bool) {
+func (m *PageMutation) CreatedBy() (r string, exists bool) {
 	v := m.created_by
 	if v == nil {
 		return
@@ -580,10 +659,10 @@ func (m *PageInfoMutation) CreatedBy() (r string, exists bool) {
 	return *v, true
 }
 
-// OldCreatedBy returns the old "created_by" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldCreatedBy returns the old "created_by" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldCreatedBy(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldCreatedBy(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCreatedBy is only allowed on UpdateOne operations")
 	}
@@ -598,17 +677,17 @@ func (m *PageInfoMutation) OldCreatedBy(ctx context.Context) (v string, err erro
 }
 
 // ResetCreatedBy resets all changes to the "created_by" field.
-func (m *PageInfoMutation) ResetCreatedBy() {
+func (m *PageMutation) ResetCreatedBy() {
 	m.created_by = nil
 }
 
 // SetUpdatedAt sets the "updated_at" field.
-func (m *PageInfoMutation) SetUpdatedAt(t time.Time) {
+func (m *PageMutation) SetUpdatedAt(t time.Time) {
 	m.updated_at = &t
 }
 
 // UpdatedAt returns the value of the "updated_at" field in the mutation.
-func (m *PageInfoMutation) UpdatedAt() (r time.Time, exists bool) {
+func (m *PageMutation) UpdatedAt() (r time.Time, exists bool) {
 	v := m.updated_at
 	if v == nil {
 		return
@@ -616,10 +695,10 @@ func (m *PageInfoMutation) UpdatedAt() (r time.Time, exists bool) {
 	return *v, true
 }
 
-// OldUpdatedAt returns the old "updated_at" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldUpdatedAt returns the old "updated_at" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+func (m *PageMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
 	}
@@ -634,17 +713,17 @@ func (m *PageInfoMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err e
 }
 
 // ResetUpdatedAt resets all changes to the "updated_at" field.
-func (m *PageInfoMutation) ResetUpdatedAt() {
+func (m *PageMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
 // SetUpdatedBy sets the "updated_by" field.
-func (m *PageInfoMutation) SetUpdatedBy(s string) {
+func (m *PageMutation) SetUpdatedBy(s string) {
 	m.updated_by = &s
 }
 
 // UpdatedBy returns the value of the "updated_by" field in the mutation.
-func (m *PageInfoMutation) UpdatedBy() (r string, exists bool) {
+func (m *PageMutation) UpdatedBy() (r string, exists bool) {
 	v := m.updated_by
 	if v == nil {
 		return
@@ -652,10 +731,10 @@ func (m *PageInfoMutation) UpdatedBy() (r string, exists bool) {
 	return *v, true
 }
 
-// OldUpdatedBy returns the old "updated_by" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldUpdatedBy returns the old "updated_by" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldUpdatedBy(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldUpdatedBy(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldUpdatedBy is only allowed on UpdateOne operations")
 	}
@@ -670,17 +749,17 @@ func (m *PageInfoMutation) OldUpdatedBy(ctx context.Context) (v string, err erro
 }
 
 // ResetUpdatedBy resets all changes to the "updated_by" field.
-func (m *PageInfoMutation) ResetUpdatedBy() {
+func (m *PageMutation) ResetUpdatedBy() {
 	m.updated_by = nil
 }
 
 // SetTitle sets the "title" field.
-func (m *PageInfoMutation) SetTitle(s string) {
+func (m *PageMutation) SetTitle(s string) {
 	m.title = &s
 }
 
 // Title returns the value of the "title" field in the mutation.
-func (m *PageInfoMutation) Title() (r string, exists bool) {
+func (m *PageMutation) Title() (r string, exists bool) {
 	v := m.title
 	if v == nil {
 		return
@@ -688,10 +767,10 @@ func (m *PageInfoMutation) Title() (r string, exists bool) {
 	return *v, true
 }
 
-// OldTitle returns the old "title" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldTitle returns the old "title" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldTitle(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldTitle(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
 	}
@@ -706,17 +785,17 @@ func (m *PageInfoMutation) OldTitle(ctx context.Context) (v string, err error) {
 }
 
 // ResetTitle resets all changes to the "title" field.
-func (m *PageInfoMutation) ResetTitle() {
+func (m *PageMutation) ResetTitle() {
 	m.title = nil
 }
 
 // SetDescription sets the "description" field.
-func (m *PageInfoMutation) SetDescription(s string) {
+func (m *PageMutation) SetDescription(s string) {
 	m.description = &s
 }
 
 // Description returns the value of the "description" field in the mutation.
-func (m *PageInfoMutation) Description() (r string, exists bool) {
+func (m *PageMutation) Description() (r string, exists bool) {
 	v := m.description
 	if v == nil {
 		return
@@ -724,10 +803,10 @@ func (m *PageInfoMutation) Description() (r string, exists bool) {
 	return *v, true
 }
 
-// OldDescription returns the old "description" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldDescription returns the old "description" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldDescription(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldDescription(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldDescription is only allowed on UpdateOne operations")
 	}
@@ -742,17 +821,17 @@ func (m *PageInfoMutation) OldDescription(ctx context.Context) (v string, err er
 }
 
 // ResetDescription resets all changes to the "description" field.
-func (m *PageInfoMutation) ResetDescription() {
+func (m *PageMutation) ResetDescription() {
 	m.description = nil
 }
 
 // SetKeywords sets the "keywords" field.
-func (m *PageInfoMutation) SetKeywords(s string) {
+func (m *PageMutation) SetKeywords(s string) {
 	m.keywords = &s
 }
 
 // Keywords returns the value of the "keywords" field in the mutation.
-func (m *PageInfoMutation) Keywords() (r string, exists bool) {
+func (m *PageMutation) Keywords() (r string, exists bool) {
 	v := m.keywords
 	if v == nil {
 		return
@@ -760,10 +839,10 @@ func (m *PageInfoMutation) Keywords() (r string, exists bool) {
 	return *v, true
 }
 
-// OldKeywords returns the old "keywords" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldKeywords returns the old "keywords" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldKeywords(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldKeywords(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldKeywords is only allowed on UpdateOne operations")
 	}
@@ -778,17 +857,17 @@ func (m *PageInfoMutation) OldKeywords(ctx context.Context) (v string, err error
 }
 
 // ResetKeywords resets all changes to the "keywords" field.
-func (m *PageInfoMutation) ResetKeywords() {
+func (m *PageMutation) ResetKeywords() {
 	m.keywords = nil
 }
 
 // SetContentLanguage sets the "content_language" field.
-func (m *PageInfoMutation) SetContentLanguage(s string) {
+func (m *PageMutation) SetContentLanguage(s string) {
 	m.content_language = &s
 }
 
 // ContentLanguage returns the value of the "content_language" field in the mutation.
-func (m *PageInfoMutation) ContentLanguage() (r string, exists bool) {
+func (m *PageMutation) ContentLanguage() (r string, exists bool) {
 	v := m.content_language
 	if v == nil {
 		return
@@ -796,10 +875,10 @@ func (m *PageInfoMutation) ContentLanguage() (r string, exists bool) {
 	return *v, true
 }
 
-// OldContentLanguage returns the old "content_language" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldContentLanguage returns the old "content_language" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldContentLanguage(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldContentLanguage(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldContentLanguage is only allowed on UpdateOne operations")
 	}
@@ -814,17 +893,17 @@ func (m *PageInfoMutation) OldContentLanguage(ctx context.Context) (v string, er
 }
 
 // ResetContentLanguage resets all changes to the "content_language" field.
-func (m *PageInfoMutation) ResetContentLanguage() {
+func (m *PageMutation) ResetContentLanguage() {
 	m.content_language = nil
 }
 
 // SetTwitterCard sets the "twitter_card" field.
-func (m *PageInfoMutation) SetTwitterCard(s string) {
+func (m *PageMutation) SetTwitterCard(s string) {
 	m.twitter_card = &s
 }
 
 // TwitterCard returns the value of the "twitter_card" field in the mutation.
-func (m *PageInfoMutation) TwitterCard() (r string, exists bool) {
+func (m *PageMutation) TwitterCard() (r string, exists bool) {
 	v := m.twitter_card
 	if v == nil {
 		return
@@ -832,10 +911,10 @@ func (m *PageInfoMutation) TwitterCard() (r string, exists bool) {
 	return *v, true
 }
 
-// OldTwitterCard returns the old "twitter_card" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldTwitterCard returns the old "twitter_card" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldTwitterCard(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldTwitterCard(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTwitterCard is only allowed on UpdateOne operations")
 	}
@@ -850,17 +929,17 @@ func (m *PageInfoMutation) OldTwitterCard(ctx context.Context) (v string, err er
 }
 
 // ResetTwitterCard resets all changes to the "twitter_card" field.
-func (m *PageInfoMutation) ResetTwitterCard() {
+func (m *PageMutation) ResetTwitterCard() {
 	m.twitter_card = nil
 }
 
 // SetTwitterURL sets the "twitter_url" field.
-func (m *PageInfoMutation) SetTwitterURL(s string) {
+func (m *PageMutation) SetTwitterURL(s string) {
 	m.twitter_url = &s
 }
 
 // TwitterURL returns the value of the "twitter_url" field in the mutation.
-func (m *PageInfoMutation) TwitterURL() (r string, exists bool) {
+func (m *PageMutation) TwitterURL() (r string, exists bool) {
 	v := m.twitter_url
 	if v == nil {
 		return
@@ -868,10 +947,10 @@ func (m *PageInfoMutation) TwitterURL() (r string, exists bool) {
 	return *v, true
 }
 
-// OldTwitterURL returns the old "twitter_url" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldTwitterURL returns the old "twitter_url" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldTwitterURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldTwitterURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTwitterURL is only allowed on UpdateOne operations")
 	}
@@ -886,17 +965,17 @@ func (m *PageInfoMutation) OldTwitterURL(ctx context.Context) (v string, err err
 }
 
 // ResetTwitterURL resets all changes to the "twitter_url" field.
-func (m *PageInfoMutation) ResetTwitterURL() {
+func (m *PageMutation) ResetTwitterURL() {
 	m.twitter_url = nil
 }
 
 // SetTwitterTitle sets the "twitter_title" field.
-func (m *PageInfoMutation) SetTwitterTitle(s string) {
+func (m *PageMutation) SetTwitterTitle(s string) {
 	m.twitter_title = &s
 }
 
 // TwitterTitle returns the value of the "twitter_title" field in the mutation.
-func (m *PageInfoMutation) TwitterTitle() (r string, exists bool) {
+func (m *PageMutation) TwitterTitle() (r string, exists bool) {
 	v := m.twitter_title
 	if v == nil {
 		return
@@ -904,10 +983,10 @@ func (m *PageInfoMutation) TwitterTitle() (r string, exists bool) {
 	return *v, true
 }
 
-// OldTwitterTitle returns the old "twitter_title" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldTwitterTitle returns the old "twitter_title" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldTwitterTitle(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldTwitterTitle(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTwitterTitle is only allowed on UpdateOne operations")
 	}
@@ -922,17 +1001,17 @@ func (m *PageInfoMutation) OldTwitterTitle(ctx context.Context) (v string, err e
 }
 
 // ResetTwitterTitle resets all changes to the "twitter_title" field.
-func (m *PageInfoMutation) ResetTwitterTitle() {
+func (m *PageMutation) ResetTwitterTitle() {
 	m.twitter_title = nil
 }
 
 // SetTwitterDescription sets the "twitter_description" field.
-func (m *PageInfoMutation) SetTwitterDescription(s string) {
+func (m *PageMutation) SetTwitterDescription(s string) {
 	m.twitter_description = &s
 }
 
 // TwitterDescription returns the value of the "twitter_description" field in the mutation.
-func (m *PageInfoMutation) TwitterDescription() (r string, exists bool) {
+func (m *PageMutation) TwitterDescription() (r string, exists bool) {
 	v := m.twitter_description
 	if v == nil {
 		return
@@ -940,10 +1019,10 @@ func (m *PageInfoMutation) TwitterDescription() (r string, exists bool) {
 	return *v, true
 }
 
-// OldTwitterDescription returns the old "twitter_description" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldTwitterDescription returns the old "twitter_description" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldTwitterDescription(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldTwitterDescription(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTwitterDescription is only allowed on UpdateOne operations")
 	}
@@ -958,17 +1037,17 @@ func (m *PageInfoMutation) OldTwitterDescription(ctx context.Context) (v string,
 }
 
 // ResetTwitterDescription resets all changes to the "twitter_description" field.
-func (m *PageInfoMutation) ResetTwitterDescription() {
+func (m *PageMutation) ResetTwitterDescription() {
 	m.twitter_description = nil
 }
 
 // SetTwitterImage sets the "twitter_image" field.
-func (m *PageInfoMutation) SetTwitterImage(s string) {
+func (m *PageMutation) SetTwitterImage(s string) {
 	m.twitter_image = &s
 }
 
 // TwitterImage returns the value of the "twitter_image" field in the mutation.
-func (m *PageInfoMutation) TwitterImage() (r string, exists bool) {
+func (m *PageMutation) TwitterImage() (r string, exists bool) {
 	v := m.twitter_image
 	if v == nil {
 		return
@@ -976,10 +1055,10 @@ func (m *PageInfoMutation) TwitterImage() (r string, exists bool) {
 	return *v, true
 }
 
-// OldTwitterImage returns the old "twitter_image" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldTwitterImage returns the old "twitter_image" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldTwitterImage(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldTwitterImage(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTwitterImage is only allowed on UpdateOne operations")
 	}
@@ -994,17 +1073,17 @@ func (m *PageInfoMutation) OldTwitterImage(ctx context.Context) (v string, err e
 }
 
 // ResetTwitterImage resets all changes to the "twitter_image" field.
-func (m *PageInfoMutation) ResetTwitterImage() {
+func (m *PageMutation) ResetTwitterImage() {
 	m.twitter_image = nil
 }
 
 // SetOgSiteName sets the "og_site_name" field.
-func (m *PageInfoMutation) SetOgSiteName(s string) {
+func (m *PageMutation) SetOgSiteName(s string) {
 	m.og_site_name = &s
 }
 
 // OgSiteName returns the value of the "og_site_name" field in the mutation.
-func (m *PageInfoMutation) OgSiteName() (r string, exists bool) {
+func (m *PageMutation) OgSiteName() (r string, exists bool) {
 	v := m.og_site_name
 	if v == nil {
 		return
@@ -1012,10 +1091,10 @@ func (m *PageInfoMutation) OgSiteName() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgSiteName returns the old "og_site_name" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgSiteName returns the old "og_site_name" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgSiteName(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgSiteName(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgSiteName is only allowed on UpdateOne operations")
 	}
@@ -1030,17 +1109,17 @@ func (m *PageInfoMutation) OldOgSiteName(ctx context.Context) (v string, err err
 }
 
 // ResetOgSiteName resets all changes to the "og_site_name" field.
-func (m *PageInfoMutation) ResetOgSiteName() {
+func (m *PageMutation) ResetOgSiteName() {
 	m.og_site_name = nil
 }
 
 // SetOgLocale sets the "og_locale" field.
-func (m *PageInfoMutation) SetOgLocale(s string) {
+func (m *PageMutation) SetOgLocale(s string) {
 	m.og_locale = &s
 }
 
 // OgLocale returns the value of the "og_locale" field in the mutation.
-func (m *PageInfoMutation) OgLocale() (r string, exists bool) {
+func (m *PageMutation) OgLocale() (r string, exists bool) {
 	v := m.og_locale
 	if v == nil {
 		return
@@ -1048,10 +1127,10 @@ func (m *PageInfoMutation) OgLocale() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgLocale returns the old "og_locale" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgLocale returns the old "og_locale" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgLocale(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgLocale(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgLocale is only allowed on UpdateOne operations")
 	}
@@ -1066,17 +1145,17 @@ func (m *PageInfoMutation) OldOgLocale(ctx context.Context) (v string, err error
 }
 
 // ResetOgLocale resets all changes to the "og_locale" field.
-func (m *PageInfoMutation) ResetOgLocale() {
+func (m *PageMutation) ResetOgLocale() {
 	m.og_locale = nil
 }
 
 // SetOgTitle sets the "og_title" field.
-func (m *PageInfoMutation) SetOgTitle(s string) {
+func (m *PageMutation) SetOgTitle(s string) {
 	m.og_title = &s
 }
 
 // OgTitle returns the value of the "og_title" field in the mutation.
-func (m *PageInfoMutation) OgTitle() (r string, exists bool) {
+func (m *PageMutation) OgTitle() (r string, exists bool) {
 	v := m.og_title
 	if v == nil {
 		return
@@ -1084,10 +1163,10 @@ func (m *PageInfoMutation) OgTitle() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgTitle returns the old "og_title" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgTitle returns the old "og_title" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgTitle(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgTitle(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgTitle is only allowed on UpdateOne operations")
 	}
@@ -1102,17 +1181,17 @@ func (m *PageInfoMutation) OldOgTitle(ctx context.Context) (v string, err error)
 }
 
 // ResetOgTitle resets all changes to the "og_title" field.
-func (m *PageInfoMutation) ResetOgTitle() {
+func (m *PageMutation) ResetOgTitle() {
 	m.og_title = nil
 }
 
 // SetOgDescription sets the "og_description" field.
-func (m *PageInfoMutation) SetOgDescription(s string) {
+func (m *PageMutation) SetOgDescription(s string) {
 	m.og_description = &s
 }
 
 // OgDescription returns the value of the "og_description" field in the mutation.
-func (m *PageInfoMutation) OgDescription() (r string, exists bool) {
+func (m *PageMutation) OgDescription() (r string, exists bool) {
 	v := m.og_description
 	if v == nil {
 		return
@@ -1120,10 +1199,10 @@ func (m *PageInfoMutation) OgDescription() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgDescription returns the old "og_description" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgDescription returns the old "og_description" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgDescription(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgDescription(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgDescription is only allowed on UpdateOne operations")
 	}
@@ -1138,17 +1217,17 @@ func (m *PageInfoMutation) OldOgDescription(ctx context.Context) (v string, err 
 }
 
 // ResetOgDescription resets all changes to the "og_description" field.
-func (m *PageInfoMutation) ResetOgDescription() {
+func (m *PageMutation) ResetOgDescription() {
 	m.og_description = nil
 }
 
 // SetOgType sets the "og_type" field.
-func (m *PageInfoMutation) SetOgType(s string) {
+func (m *PageMutation) SetOgType(s string) {
 	m.og_type = &s
 }
 
 // OgType returns the value of the "og_type" field in the mutation.
-func (m *PageInfoMutation) OgType() (r string, exists bool) {
+func (m *PageMutation) OgType() (r string, exists bool) {
 	v := m.og_type
 	if v == nil {
 		return
@@ -1156,10 +1235,10 @@ func (m *PageInfoMutation) OgType() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgType returns the old "og_type" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgType returns the old "og_type" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgType(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgType(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgType is only allowed on UpdateOne operations")
 	}
@@ -1174,17 +1253,17 @@ func (m *PageInfoMutation) OldOgType(ctx context.Context) (v string, err error) 
 }
 
 // ResetOgType resets all changes to the "og_type" field.
-func (m *PageInfoMutation) ResetOgType() {
+func (m *PageMutation) ResetOgType() {
 	m.og_type = nil
 }
 
 // SetOgURL sets the "og_url" field.
-func (m *PageInfoMutation) SetOgURL(s string) {
+func (m *PageMutation) SetOgURL(s string) {
 	m.og_url = &s
 }
 
 // OgURL returns the value of the "og_url" field in the mutation.
-func (m *PageInfoMutation) OgURL() (r string, exists bool) {
+func (m *PageMutation) OgURL() (r string, exists bool) {
 	v := m.og_url
 	if v == nil {
 		return
@@ -1192,10 +1271,10 @@ func (m *PageInfoMutation) OgURL() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgURL returns the old "og_url" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgURL returns the old "og_url" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgURL is only allowed on UpdateOne operations")
 	}
@@ -1210,17 +1289,17 @@ func (m *PageInfoMutation) OldOgURL(ctx context.Context) (v string, err error) {
 }
 
 // ResetOgURL resets all changes to the "og_url" field.
-func (m *PageInfoMutation) ResetOgURL() {
+func (m *PageMutation) ResetOgURL() {
 	m.og_url = nil
 }
 
 // SetOgImage sets the "og_image" field.
-func (m *PageInfoMutation) SetOgImage(s string) {
+func (m *PageMutation) SetOgImage(s string) {
 	m.og_image = &s
 }
 
 // OgImage returns the value of the "og_image" field in the mutation.
-func (m *PageInfoMutation) OgImage() (r string, exists bool) {
+func (m *PageMutation) OgImage() (r string, exists bool) {
 	v := m.og_image
 	if v == nil {
 		return
@@ -1228,10 +1307,10 @@ func (m *PageInfoMutation) OgImage() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgImage returns the old "og_image" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgImage returns the old "og_image" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgImage(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgImage(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgImage is only allowed on UpdateOne operations")
 	}
@@ -1246,17 +1325,17 @@ func (m *PageInfoMutation) OldOgImage(ctx context.Context) (v string, err error)
 }
 
 // ResetOgImage resets all changes to the "og_image" field.
-func (m *PageInfoMutation) ResetOgImage() {
+func (m *PageMutation) ResetOgImage() {
 	m.og_image = nil
 }
 
 // SetOgImageType sets the "og_image_type" field.
-func (m *PageInfoMutation) SetOgImageType(s string) {
+func (m *PageMutation) SetOgImageType(s string) {
 	m.og_image_type = &s
 }
 
 // OgImageType returns the value of the "og_image_type" field in the mutation.
-func (m *PageInfoMutation) OgImageType() (r string, exists bool) {
+func (m *PageMutation) OgImageType() (r string, exists bool) {
 	v := m.og_image_type
 	if v == nil {
 		return
@@ -1264,10 +1343,10 @@ func (m *PageInfoMutation) OgImageType() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgImageType returns the old "og_image_type" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgImageType returns the old "og_image_type" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgImageType(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgImageType(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgImageType is only allowed on UpdateOne operations")
 	}
@@ -1282,17 +1361,17 @@ func (m *PageInfoMutation) OldOgImageType(ctx context.Context) (v string, err er
 }
 
 // ResetOgImageType resets all changes to the "og_image_type" field.
-func (m *PageInfoMutation) ResetOgImageType() {
+func (m *PageMutation) ResetOgImageType() {
 	m.og_image_type = nil
 }
 
 // SetOgImageURL sets the "og_image_url" field.
-func (m *PageInfoMutation) SetOgImageURL(s string) {
+func (m *PageMutation) SetOgImageURL(s string) {
 	m.og_image_url = &s
 }
 
 // OgImageURL returns the value of the "og_image_url" field in the mutation.
-func (m *PageInfoMutation) OgImageURL() (r string, exists bool) {
+func (m *PageMutation) OgImageURL() (r string, exists bool) {
 	v := m.og_image_url
 	if v == nil {
 		return
@@ -1300,10 +1379,10 @@ func (m *PageInfoMutation) OgImageURL() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgImageURL returns the old "og_image_url" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgImageURL returns the old "og_image_url" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgImageURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgImageURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgImageURL is only allowed on UpdateOne operations")
 	}
@@ -1318,17 +1397,17 @@ func (m *PageInfoMutation) OldOgImageURL(ctx context.Context) (v string, err err
 }
 
 // ResetOgImageURL resets all changes to the "og_image_url" field.
-func (m *PageInfoMutation) ResetOgImageURL() {
+func (m *PageMutation) ResetOgImageURL() {
 	m.og_image_url = nil
 }
 
 // SetOgImageSecureURL sets the "og_image_secure_url" field.
-func (m *PageInfoMutation) SetOgImageSecureURL(s string) {
+func (m *PageMutation) SetOgImageSecureURL(s string) {
 	m.og_image_secure_url = &s
 }
 
 // OgImageSecureURL returns the value of the "og_image_secure_url" field in the mutation.
-func (m *PageInfoMutation) OgImageSecureURL() (r string, exists bool) {
+func (m *PageMutation) OgImageSecureURL() (r string, exists bool) {
 	v := m.og_image_secure_url
 	if v == nil {
 		return
@@ -1336,10 +1415,10 @@ func (m *PageInfoMutation) OgImageSecureURL() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgImageSecureURL returns the old "og_image_secure_url" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgImageSecureURL returns the old "og_image_secure_url" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgImageSecureURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgImageSecureURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgImageSecureURL is only allowed on UpdateOne operations")
 	}
@@ -1354,17 +1433,17 @@ func (m *PageInfoMutation) OldOgImageSecureURL(ctx context.Context) (v string, e
 }
 
 // ResetOgImageSecureURL resets all changes to the "og_image_secure_url" field.
-func (m *PageInfoMutation) ResetOgImageSecureURL() {
+func (m *PageMutation) ResetOgImageSecureURL() {
 	m.og_image_secure_url = nil
 }
 
 // SetOgImageWidth sets the "og_image_width" field.
-func (m *PageInfoMutation) SetOgImageWidth(s string) {
+func (m *PageMutation) SetOgImageWidth(s string) {
 	m.og_image_width = &s
 }
 
 // OgImageWidth returns the value of the "og_image_width" field in the mutation.
-func (m *PageInfoMutation) OgImageWidth() (r string, exists bool) {
+func (m *PageMutation) OgImageWidth() (r string, exists bool) {
 	v := m.og_image_width
 	if v == nil {
 		return
@@ -1372,10 +1451,10 @@ func (m *PageInfoMutation) OgImageWidth() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgImageWidth returns the old "og_image_width" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgImageWidth returns the old "og_image_width" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgImageWidth(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgImageWidth(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgImageWidth is only allowed on UpdateOne operations")
 	}
@@ -1390,17 +1469,17 @@ func (m *PageInfoMutation) OldOgImageWidth(ctx context.Context) (v string, err e
 }
 
 // ResetOgImageWidth resets all changes to the "og_image_width" field.
-func (m *PageInfoMutation) ResetOgImageWidth() {
+func (m *PageMutation) ResetOgImageWidth() {
 	m.og_image_width = nil
 }
 
 // SetOgImageHeight sets the "og_image_height" field.
-func (m *PageInfoMutation) SetOgImageHeight(s string) {
+func (m *PageMutation) SetOgImageHeight(s string) {
 	m.og_image_height = &s
 }
 
 // OgImageHeight returns the value of the "og_image_height" field in the mutation.
-func (m *PageInfoMutation) OgImageHeight() (r string, exists bool) {
+func (m *PageMutation) OgImageHeight() (r string, exists bool) {
 	v := m.og_image_height
 	if v == nil {
 		return
@@ -1408,10 +1487,10 @@ func (m *PageInfoMutation) OgImageHeight() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgImageHeight returns the old "og_image_height" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgImageHeight returns the old "og_image_height" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgImageHeight(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgImageHeight(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgImageHeight is only allowed on UpdateOne operations")
 	}
@@ -1426,17 +1505,17 @@ func (m *PageInfoMutation) OldOgImageHeight(ctx context.Context) (v string, err 
 }
 
 // ResetOgImageHeight resets all changes to the "og_image_height" field.
-func (m *PageInfoMutation) ResetOgImageHeight() {
+func (m *PageMutation) ResetOgImageHeight() {
 	m.og_image_height = nil
 }
 
 // SetOgVideo sets the "og_video" field.
-func (m *PageInfoMutation) SetOgVideo(s string) {
+func (m *PageMutation) SetOgVideo(s string) {
 	m.og_video = &s
 }
 
 // OgVideo returns the value of the "og_video" field in the mutation.
-func (m *PageInfoMutation) OgVideo() (r string, exists bool) {
+func (m *PageMutation) OgVideo() (r string, exists bool) {
 	v := m.og_video
 	if v == nil {
 		return
@@ -1444,10 +1523,10 @@ func (m *PageInfoMutation) OgVideo() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgVideo returns the old "og_video" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgVideo returns the old "og_video" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgVideo(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgVideo(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgVideo is only allowed on UpdateOne operations")
 	}
@@ -1462,17 +1541,17 @@ func (m *PageInfoMutation) OldOgVideo(ctx context.Context) (v string, err error)
 }
 
 // ResetOgVideo resets all changes to the "og_video" field.
-func (m *PageInfoMutation) ResetOgVideo() {
+func (m *PageMutation) ResetOgVideo() {
 	m.og_video = nil
 }
 
 // SetOgVideoType sets the "og_video_type" field.
-func (m *PageInfoMutation) SetOgVideoType(s string) {
+func (m *PageMutation) SetOgVideoType(s string) {
 	m.og_video_type = &s
 }
 
 // OgVideoType returns the value of the "og_video_type" field in the mutation.
-func (m *PageInfoMutation) OgVideoType() (r string, exists bool) {
+func (m *PageMutation) OgVideoType() (r string, exists bool) {
 	v := m.og_video_type
 	if v == nil {
 		return
@@ -1480,10 +1559,10 @@ func (m *PageInfoMutation) OgVideoType() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgVideoType returns the old "og_video_type" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgVideoType returns the old "og_video_type" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgVideoType(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgVideoType(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgVideoType is only allowed on UpdateOne operations")
 	}
@@ -1498,17 +1577,17 @@ func (m *PageInfoMutation) OldOgVideoType(ctx context.Context) (v string, err er
 }
 
 // ResetOgVideoType resets all changes to the "og_video_type" field.
-func (m *PageInfoMutation) ResetOgVideoType() {
+func (m *PageMutation) ResetOgVideoType() {
 	m.og_video_type = nil
 }
 
 // SetOgVideoURL sets the "og_video_url" field.
-func (m *PageInfoMutation) SetOgVideoURL(s string) {
+func (m *PageMutation) SetOgVideoURL(s string) {
 	m.og_video_url = &s
 }
 
 // OgVideoURL returns the value of the "og_video_url" field in the mutation.
-func (m *PageInfoMutation) OgVideoURL() (r string, exists bool) {
+func (m *PageMutation) OgVideoURL() (r string, exists bool) {
 	v := m.og_video_url
 	if v == nil {
 		return
@@ -1516,10 +1595,10 @@ func (m *PageInfoMutation) OgVideoURL() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgVideoURL returns the old "og_video_url" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgVideoURL returns the old "og_video_url" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgVideoURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgVideoURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgVideoURL is only allowed on UpdateOne operations")
 	}
@@ -1534,17 +1613,17 @@ func (m *PageInfoMutation) OldOgVideoURL(ctx context.Context) (v string, err err
 }
 
 // ResetOgVideoURL resets all changes to the "og_video_url" field.
-func (m *PageInfoMutation) ResetOgVideoURL() {
+func (m *PageMutation) ResetOgVideoURL() {
 	m.og_video_url = nil
 }
 
 // SetOgVideoSecureURL sets the "og_video_secure_url" field.
-func (m *PageInfoMutation) SetOgVideoSecureURL(s string) {
+func (m *PageMutation) SetOgVideoSecureURL(s string) {
 	m.og_video_secure_url = &s
 }
 
 // OgVideoSecureURL returns the value of the "og_video_secure_url" field in the mutation.
-func (m *PageInfoMutation) OgVideoSecureURL() (r string, exists bool) {
+func (m *PageMutation) OgVideoSecureURL() (r string, exists bool) {
 	v := m.og_video_secure_url
 	if v == nil {
 		return
@@ -1552,10 +1631,10 @@ func (m *PageInfoMutation) OgVideoSecureURL() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgVideoSecureURL returns the old "og_video_secure_url" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgVideoSecureURL returns the old "og_video_secure_url" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgVideoSecureURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgVideoSecureURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgVideoSecureURL is only allowed on UpdateOne operations")
 	}
@@ -1570,17 +1649,17 @@ func (m *PageInfoMutation) OldOgVideoSecureURL(ctx context.Context) (v string, e
 }
 
 // ResetOgVideoSecureURL resets all changes to the "og_video_secure_url" field.
-func (m *PageInfoMutation) ResetOgVideoSecureURL() {
+func (m *PageMutation) ResetOgVideoSecureURL() {
 	m.og_video_secure_url = nil
 }
 
 // SetOgVideoWidth sets the "og_video_width" field.
-func (m *PageInfoMutation) SetOgVideoWidth(s string) {
+func (m *PageMutation) SetOgVideoWidth(s string) {
 	m.og_video_width = &s
 }
 
 // OgVideoWidth returns the value of the "og_video_width" field in the mutation.
-func (m *PageInfoMutation) OgVideoWidth() (r string, exists bool) {
+func (m *PageMutation) OgVideoWidth() (r string, exists bool) {
 	v := m.og_video_width
 	if v == nil {
 		return
@@ -1588,10 +1667,10 @@ func (m *PageInfoMutation) OgVideoWidth() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgVideoWidth returns the old "og_video_width" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgVideoWidth returns the old "og_video_width" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgVideoWidth(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgVideoWidth(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgVideoWidth is only allowed on UpdateOne operations")
 	}
@@ -1606,17 +1685,17 @@ func (m *PageInfoMutation) OldOgVideoWidth(ctx context.Context) (v string, err e
 }
 
 // ResetOgVideoWidth resets all changes to the "og_video_width" field.
-func (m *PageInfoMutation) ResetOgVideoWidth() {
+func (m *PageMutation) ResetOgVideoWidth() {
 	m.og_video_width = nil
 }
 
 // SetOgVideoHeight sets the "og_video_height" field.
-func (m *PageInfoMutation) SetOgVideoHeight(s string) {
+func (m *PageMutation) SetOgVideoHeight(s string) {
 	m.og_video_height = &s
 }
 
 // OgVideoHeight returns the value of the "og_video_height" field in the mutation.
-func (m *PageInfoMutation) OgVideoHeight() (r string, exists bool) {
+func (m *PageMutation) OgVideoHeight() (r string, exists bool) {
 	v := m.og_video_height
 	if v == nil {
 		return
@@ -1624,10 +1703,10 @@ func (m *PageInfoMutation) OgVideoHeight() (r string, exists bool) {
 	return *v, true
 }
 
-// OldOgVideoHeight returns the old "og_video_height" field's value of the PageInfo entity.
-// If the PageInfo object wasn't provided to the builder, the object is fetched from the database.
+// OldOgVideoHeight returns the old "og_video_height" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageInfoMutation) OldOgVideoHeight(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldOgVideoHeight(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOgVideoHeight is only allowed on UpdateOne operations")
 	}
@@ -1642,149 +1721,209 @@ func (m *PageInfoMutation) OldOgVideoHeight(ctx context.Context) (v string, err 
 }
 
 // ResetOgVideoHeight resets all changes to the "og_video_height" field.
-func (m *PageInfoMutation) ResetOgVideoHeight() {
+func (m *PageMutation) ResetOgVideoHeight() {
 	m.og_video_height = nil
 }
 
-// Where appends a list predicates to the PageInfoMutation builder.
-func (m *PageInfoMutation) Where(ps ...predicate.PageInfo) {
+// AddPageSourceIDs adds the "page_source" edge to the PageSource entity by ids.
+func (m *PageMutation) AddPageSourceIDs(ids ...string) {
+	if m.page_source == nil {
+		m.page_source = make(map[string]struct{})
+	}
+	for i := range ids {
+		m.page_source[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPageSource clears the "page_source" edge to the PageSource entity.
+func (m *PageMutation) ClearPageSource() {
+	m.clearedpage_source = true
+}
+
+// PageSourceCleared reports if the "page_source" edge to the PageSource entity was cleared.
+func (m *PageMutation) PageSourceCleared() bool {
+	return m.clearedpage_source
+}
+
+// RemovePageSourceIDs removes the "page_source" edge to the PageSource entity by IDs.
+func (m *PageMutation) RemovePageSourceIDs(ids ...string) {
+	if m.removedpage_source == nil {
+		m.removedpage_source = make(map[string]struct{})
+	}
+	for i := range ids {
+		delete(m.page_source, ids[i])
+		m.removedpage_source[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPageSource returns the removed IDs of the "page_source" edge to the PageSource entity.
+func (m *PageMutation) RemovedPageSourceIDs() (ids []string) {
+	for id := range m.removedpage_source {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PageSourceIDs returns the "page_source" edge IDs in the mutation.
+func (m *PageMutation) PageSourceIDs() (ids []string) {
+	for id := range m.page_source {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPageSource resets all changes to the "page_source" edge.
+func (m *PageMutation) ResetPageSource() {
+	m.page_source = nil
+	m.clearedpage_source = false
+	m.removedpage_source = nil
+}
+
+// Where appends a list predicates to the PageMutation builder.
+func (m *PageMutation) Where(ps ...predicate.Page) {
 	m.predicates = append(m.predicates, ps...)
 }
 
 // Op returns the operation name.
-func (m *PageInfoMutation) Op() Op {
+func (m *PageMutation) Op() Op {
 	return m.op
 }
 
-// Type returns the node type of this mutation (PageInfo).
-func (m *PageInfoMutation) Type() string {
+// Type returns the node type of this mutation (Page).
+func (m *PageMutation) Type() string {
 	return m.typ
 }
 
 // Fields returns all fields that were changed during this mutation. Note that in
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
-func (m *PageInfoMutation) Fields() []string {
-	fields := make([]string, 0, 40)
+func (m *PageMutation) Fields() []string {
+	fields := make([]string, 0, 42)
+	if m.referred_id != nil {
+		fields = append(fields, page.FieldReferredID)
+	}
+	if m.crawling_version != nil {
+		fields = append(fields, page.FieldCrawlingVersion)
+	}
 	if m.domain != nil {
-		fields = append(fields, pageinfo.FieldDomain)
+		fields = append(fields, page.FieldDomain)
 	}
 	if m.port != nil {
-		fields = append(fields, pageinfo.FieldPort)
+		fields = append(fields, page.FieldPort)
 	}
 	if m.is_https != nil {
-		fields = append(fields, pageinfo.FieldIsHTTPS)
+		fields = append(fields, page.FieldIsHTTPS)
 	}
 	if m.indexed_url != nil {
-		fields = append(fields, pageinfo.FieldIndexedURL)
+		fields = append(fields, page.FieldIndexedURL)
 	}
 	if m._path != nil {
-		fields = append(fields, pageinfo.FieldPath)
+		fields = append(fields, page.FieldPath)
 	}
 	if m.querystring != nil {
-		fields = append(fields, pageinfo.FieldQuerystring)
+		fields = append(fields, page.FieldQuerystring)
 	}
 	if m.url != nil {
-		fields = append(fields, pageinfo.FieldURL)
+		fields = append(fields, page.FieldURL)
 	}
 	if m.count_referred != nil {
-		fields = append(fields, pageinfo.FieldCountReferred)
+		fields = append(fields, page.FieldCountReferred)
 	}
 	if m.status != nil {
-		fields = append(fields, pageinfo.FieldStatus)
+		fields = append(fields, page.FieldStatus)
 	}
 	if m.created_at != nil {
-		fields = append(fields, pageinfo.FieldCreatedAt)
+		fields = append(fields, page.FieldCreatedAt)
 	}
 	if m.created_by != nil {
-		fields = append(fields, pageinfo.FieldCreatedBy)
+		fields = append(fields, page.FieldCreatedBy)
 	}
 	if m.updated_at != nil {
-		fields = append(fields, pageinfo.FieldUpdatedAt)
+		fields = append(fields, page.FieldUpdatedAt)
 	}
 	if m.updated_by != nil {
-		fields = append(fields, pageinfo.FieldUpdatedBy)
+		fields = append(fields, page.FieldUpdatedBy)
 	}
 	if m.title != nil {
-		fields = append(fields, pageinfo.FieldTitle)
+		fields = append(fields, page.FieldTitle)
 	}
 	if m.description != nil {
-		fields = append(fields, pageinfo.FieldDescription)
+		fields = append(fields, page.FieldDescription)
 	}
 	if m.keywords != nil {
-		fields = append(fields, pageinfo.FieldKeywords)
+		fields = append(fields, page.FieldKeywords)
 	}
 	if m.content_language != nil {
-		fields = append(fields, pageinfo.FieldContentLanguage)
+		fields = append(fields, page.FieldContentLanguage)
 	}
 	if m.twitter_card != nil {
-		fields = append(fields, pageinfo.FieldTwitterCard)
+		fields = append(fields, page.FieldTwitterCard)
 	}
 	if m.twitter_url != nil {
-		fields = append(fields, pageinfo.FieldTwitterURL)
+		fields = append(fields, page.FieldTwitterURL)
 	}
 	if m.twitter_title != nil {
-		fields = append(fields, pageinfo.FieldTwitterTitle)
+		fields = append(fields, page.FieldTwitterTitle)
 	}
 	if m.twitter_description != nil {
-		fields = append(fields, pageinfo.FieldTwitterDescription)
+		fields = append(fields, page.FieldTwitterDescription)
 	}
 	if m.twitter_image != nil {
-		fields = append(fields, pageinfo.FieldTwitterImage)
+		fields = append(fields, page.FieldTwitterImage)
 	}
 	if m.og_site_name != nil {
-		fields = append(fields, pageinfo.FieldOgSiteName)
+		fields = append(fields, page.FieldOgSiteName)
 	}
 	if m.og_locale != nil {
-		fields = append(fields, pageinfo.FieldOgLocale)
+		fields = append(fields, page.FieldOgLocale)
 	}
 	if m.og_title != nil {
-		fields = append(fields, pageinfo.FieldOgTitle)
+		fields = append(fields, page.FieldOgTitle)
 	}
 	if m.og_description != nil {
-		fields = append(fields, pageinfo.FieldOgDescription)
+		fields = append(fields, page.FieldOgDescription)
 	}
 	if m.og_type != nil {
-		fields = append(fields, pageinfo.FieldOgType)
+		fields = append(fields, page.FieldOgType)
 	}
 	if m.og_url != nil {
-		fields = append(fields, pageinfo.FieldOgURL)
+		fields = append(fields, page.FieldOgURL)
 	}
 	if m.og_image != nil {
-		fields = append(fields, pageinfo.FieldOgImage)
+		fields = append(fields, page.FieldOgImage)
 	}
 	if m.og_image_type != nil {
-		fields = append(fields, pageinfo.FieldOgImageType)
+		fields = append(fields, page.FieldOgImageType)
 	}
 	if m.og_image_url != nil {
-		fields = append(fields, pageinfo.FieldOgImageURL)
+		fields = append(fields, page.FieldOgImageURL)
 	}
 	if m.og_image_secure_url != nil {
-		fields = append(fields, pageinfo.FieldOgImageSecureURL)
+		fields = append(fields, page.FieldOgImageSecureURL)
 	}
 	if m.og_image_width != nil {
-		fields = append(fields, pageinfo.FieldOgImageWidth)
+		fields = append(fields, page.FieldOgImageWidth)
 	}
 	if m.og_image_height != nil {
-		fields = append(fields, pageinfo.FieldOgImageHeight)
+		fields = append(fields, page.FieldOgImageHeight)
 	}
 	if m.og_video != nil {
-		fields = append(fields, pageinfo.FieldOgVideo)
+		fields = append(fields, page.FieldOgVideo)
 	}
 	if m.og_video_type != nil {
-		fields = append(fields, pageinfo.FieldOgVideoType)
+		fields = append(fields, page.FieldOgVideoType)
 	}
 	if m.og_video_url != nil {
-		fields = append(fields, pageinfo.FieldOgVideoURL)
+		fields = append(fields, page.FieldOgVideoURL)
 	}
 	if m.og_video_secure_url != nil {
-		fields = append(fields, pageinfo.FieldOgVideoSecureURL)
+		fields = append(fields, page.FieldOgVideoSecureURL)
 	}
 	if m.og_video_width != nil {
-		fields = append(fields, pageinfo.FieldOgVideoWidth)
+		fields = append(fields, page.FieldOgVideoWidth)
 	}
 	if m.og_video_height != nil {
-		fields = append(fields, pageinfo.FieldOgVideoHeight)
+		fields = append(fields, page.FieldOgVideoHeight)
 	}
 	return fields
 }
@@ -1792,87 +1931,91 @@ func (m *PageInfoMutation) Fields() []string {
 // Field returns the value of a field with the given name. The second boolean
 // return value indicates that this field was not set, or was not defined in the
 // schema.
-func (m *PageInfoMutation) Field(name string) (ent.Value, bool) {
+func (m *PageMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case pageinfo.FieldDomain:
+	case page.FieldReferredID:
+		return m.ReferredID()
+	case page.FieldCrawlingVersion:
+		return m.CrawlingVersion()
+	case page.FieldDomain:
 		return m.Domain()
-	case pageinfo.FieldPort:
+	case page.FieldPort:
 		return m.Port()
-	case pageinfo.FieldIsHTTPS:
+	case page.FieldIsHTTPS:
 		return m.IsHTTPS()
-	case pageinfo.FieldIndexedURL:
+	case page.FieldIndexedURL:
 		return m.IndexedURL()
-	case pageinfo.FieldPath:
+	case page.FieldPath:
 		return m.Path()
-	case pageinfo.FieldQuerystring:
+	case page.FieldQuerystring:
 		return m.Querystring()
-	case pageinfo.FieldURL:
+	case page.FieldURL:
 		return m.URL()
-	case pageinfo.FieldCountReferred:
+	case page.FieldCountReferred:
 		return m.CountReferred()
-	case pageinfo.FieldStatus:
+	case page.FieldStatus:
 		return m.Status()
-	case pageinfo.FieldCreatedAt:
+	case page.FieldCreatedAt:
 		return m.CreatedAt()
-	case pageinfo.FieldCreatedBy:
+	case page.FieldCreatedBy:
 		return m.CreatedBy()
-	case pageinfo.FieldUpdatedAt:
+	case page.FieldUpdatedAt:
 		return m.UpdatedAt()
-	case pageinfo.FieldUpdatedBy:
+	case page.FieldUpdatedBy:
 		return m.UpdatedBy()
-	case pageinfo.FieldTitle:
+	case page.FieldTitle:
 		return m.Title()
-	case pageinfo.FieldDescription:
+	case page.FieldDescription:
 		return m.Description()
-	case pageinfo.FieldKeywords:
+	case page.FieldKeywords:
 		return m.Keywords()
-	case pageinfo.FieldContentLanguage:
+	case page.FieldContentLanguage:
 		return m.ContentLanguage()
-	case pageinfo.FieldTwitterCard:
+	case page.FieldTwitterCard:
 		return m.TwitterCard()
-	case pageinfo.FieldTwitterURL:
+	case page.FieldTwitterURL:
 		return m.TwitterURL()
-	case pageinfo.FieldTwitterTitle:
+	case page.FieldTwitterTitle:
 		return m.TwitterTitle()
-	case pageinfo.FieldTwitterDescription:
+	case page.FieldTwitterDescription:
 		return m.TwitterDescription()
-	case pageinfo.FieldTwitterImage:
+	case page.FieldTwitterImage:
 		return m.TwitterImage()
-	case pageinfo.FieldOgSiteName:
+	case page.FieldOgSiteName:
 		return m.OgSiteName()
-	case pageinfo.FieldOgLocale:
+	case page.FieldOgLocale:
 		return m.OgLocale()
-	case pageinfo.FieldOgTitle:
+	case page.FieldOgTitle:
 		return m.OgTitle()
-	case pageinfo.FieldOgDescription:
+	case page.FieldOgDescription:
 		return m.OgDescription()
-	case pageinfo.FieldOgType:
+	case page.FieldOgType:
 		return m.OgType()
-	case pageinfo.FieldOgURL:
+	case page.FieldOgURL:
 		return m.OgURL()
-	case pageinfo.FieldOgImage:
+	case page.FieldOgImage:
 		return m.OgImage()
-	case pageinfo.FieldOgImageType:
+	case page.FieldOgImageType:
 		return m.OgImageType()
-	case pageinfo.FieldOgImageURL:
+	case page.FieldOgImageURL:
 		return m.OgImageURL()
-	case pageinfo.FieldOgImageSecureURL:
+	case page.FieldOgImageSecureURL:
 		return m.OgImageSecureURL()
-	case pageinfo.FieldOgImageWidth:
+	case page.FieldOgImageWidth:
 		return m.OgImageWidth()
-	case pageinfo.FieldOgImageHeight:
+	case page.FieldOgImageHeight:
 		return m.OgImageHeight()
-	case pageinfo.FieldOgVideo:
+	case page.FieldOgVideo:
 		return m.OgVideo()
-	case pageinfo.FieldOgVideoType:
+	case page.FieldOgVideoType:
 		return m.OgVideoType()
-	case pageinfo.FieldOgVideoURL:
+	case page.FieldOgVideoURL:
 		return m.OgVideoURL()
-	case pageinfo.FieldOgVideoSecureURL:
+	case page.FieldOgVideoSecureURL:
 		return m.OgVideoSecureURL()
-	case pageinfo.FieldOgVideoWidth:
+	case page.FieldOgVideoWidth:
 		return m.OgVideoWidth()
-	case pageinfo.FieldOgVideoHeight:
+	case page.FieldOgVideoHeight:
 		return m.OgVideoHeight()
 	}
 	return nil, false
@@ -1881,371 +2024,389 @@ func (m *PageInfoMutation) Field(name string) (ent.Value, bool) {
 // OldField returns the old value of the field from the database. An error is
 // returned if the mutation operation is not UpdateOne, or the query to the
 // database failed.
-func (m *PageInfoMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+func (m *PageMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
-	case pageinfo.FieldDomain:
+	case page.FieldReferredID:
+		return m.OldReferredID(ctx)
+	case page.FieldCrawlingVersion:
+		return m.OldCrawlingVersion(ctx)
+	case page.FieldDomain:
 		return m.OldDomain(ctx)
-	case pageinfo.FieldPort:
+	case page.FieldPort:
 		return m.OldPort(ctx)
-	case pageinfo.FieldIsHTTPS:
+	case page.FieldIsHTTPS:
 		return m.OldIsHTTPS(ctx)
-	case pageinfo.FieldIndexedURL:
+	case page.FieldIndexedURL:
 		return m.OldIndexedURL(ctx)
-	case pageinfo.FieldPath:
+	case page.FieldPath:
 		return m.OldPath(ctx)
-	case pageinfo.FieldQuerystring:
+	case page.FieldQuerystring:
 		return m.OldQuerystring(ctx)
-	case pageinfo.FieldURL:
+	case page.FieldURL:
 		return m.OldURL(ctx)
-	case pageinfo.FieldCountReferred:
+	case page.FieldCountReferred:
 		return m.OldCountReferred(ctx)
-	case pageinfo.FieldStatus:
+	case page.FieldStatus:
 		return m.OldStatus(ctx)
-	case pageinfo.FieldCreatedAt:
+	case page.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
-	case pageinfo.FieldCreatedBy:
+	case page.FieldCreatedBy:
 		return m.OldCreatedBy(ctx)
-	case pageinfo.FieldUpdatedAt:
+	case page.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
-	case pageinfo.FieldUpdatedBy:
+	case page.FieldUpdatedBy:
 		return m.OldUpdatedBy(ctx)
-	case pageinfo.FieldTitle:
+	case page.FieldTitle:
 		return m.OldTitle(ctx)
-	case pageinfo.FieldDescription:
+	case page.FieldDescription:
 		return m.OldDescription(ctx)
-	case pageinfo.FieldKeywords:
+	case page.FieldKeywords:
 		return m.OldKeywords(ctx)
-	case pageinfo.FieldContentLanguage:
+	case page.FieldContentLanguage:
 		return m.OldContentLanguage(ctx)
-	case pageinfo.FieldTwitterCard:
+	case page.FieldTwitterCard:
 		return m.OldTwitterCard(ctx)
-	case pageinfo.FieldTwitterURL:
+	case page.FieldTwitterURL:
 		return m.OldTwitterURL(ctx)
-	case pageinfo.FieldTwitterTitle:
+	case page.FieldTwitterTitle:
 		return m.OldTwitterTitle(ctx)
-	case pageinfo.FieldTwitterDescription:
+	case page.FieldTwitterDescription:
 		return m.OldTwitterDescription(ctx)
-	case pageinfo.FieldTwitterImage:
+	case page.FieldTwitterImage:
 		return m.OldTwitterImage(ctx)
-	case pageinfo.FieldOgSiteName:
+	case page.FieldOgSiteName:
 		return m.OldOgSiteName(ctx)
-	case pageinfo.FieldOgLocale:
+	case page.FieldOgLocale:
 		return m.OldOgLocale(ctx)
-	case pageinfo.FieldOgTitle:
+	case page.FieldOgTitle:
 		return m.OldOgTitle(ctx)
-	case pageinfo.FieldOgDescription:
+	case page.FieldOgDescription:
 		return m.OldOgDescription(ctx)
-	case pageinfo.FieldOgType:
+	case page.FieldOgType:
 		return m.OldOgType(ctx)
-	case pageinfo.FieldOgURL:
+	case page.FieldOgURL:
 		return m.OldOgURL(ctx)
-	case pageinfo.FieldOgImage:
+	case page.FieldOgImage:
 		return m.OldOgImage(ctx)
-	case pageinfo.FieldOgImageType:
+	case page.FieldOgImageType:
 		return m.OldOgImageType(ctx)
-	case pageinfo.FieldOgImageURL:
+	case page.FieldOgImageURL:
 		return m.OldOgImageURL(ctx)
-	case pageinfo.FieldOgImageSecureURL:
+	case page.FieldOgImageSecureURL:
 		return m.OldOgImageSecureURL(ctx)
-	case pageinfo.FieldOgImageWidth:
+	case page.FieldOgImageWidth:
 		return m.OldOgImageWidth(ctx)
-	case pageinfo.FieldOgImageHeight:
+	case page.FieldOgImageHeight:
 		return m.OldOgImageHeight(ctx)
-	case pageinfo.FieldOgVideo:
+	case page.FieldOgVideo:
 		return m.OldOgVideo(ctx)
-	case pageinfo.FieldOgVideoType:
+	case page.FieldOgVideoType:
 		return m.OldOgVideoType(ctx)
-	case pageinfo.FieldOgVideoURL:
+	case page.FieldOgVideoURL:
 		return m.OldOgVideoURL(ctx)
-	case pageinfo.FieldOgVideoSecureURL:
+	case page.FieldOgVideoSecureURL:
 		return m.OldOgVideoSecureURL(ctx)
-	case pageinfo.FieldOgVideoWidth:
+	case page.FieldOgVideoWidth:
 		return m.OldOgVideoWidth(ctx)
-	case pageinfo.FieldOgVideoHeight:
+	case page.FieldOgVideoHeight:
 		return m.OldOgVideoHeight(ctx)
 	}
-	return nil, fmt.Errorf("unknown PageInfo field %s", name)
+	return nil, fmt.Errorf("unknown Page field %s", name)
 }
 
 // SetField sets the value of a field with the given name. It returns an error if
 // the field is not defined in the schema, or if the type mismatched the field
 // type.
-func (m *PageInfoMutation) SetField(name string, value ent.Value) error {
+func (m *PageMutation) SetField(name string, value ent.Value) error {
 	switch name {
-	case pageinfo.FieldDomain:
+	case page.FieldReferredID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferredID(v)
+		return nil
+	case page.FieldCrawlingVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCrawlingVersion(v)
+		return nil
+	case page.FieldDomain:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDomain(v)
 		return nil
-	case pageinfo.FieldPort:
+	case page.FieldPort:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPort(v)
 		return nil
-	case pageinfo.FieldIsHTTPS:
+	case page.FieldIsHTTPS:
 		v, ok := value.(bool)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIsHTTPS(v)
 		return nil
-	case pageinfo.FieldIndexedURL:
+	case page.FieldIndexedURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIndexedURL(v)
 		return nil
-	case pageinfo.FieldPath:
+	case page.FieldPath:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPath(v)
 		return nil
-	case pageinfo.FieldQuerystring:
+	case page.FieldQuerystring:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetQuerystring(v)
 		return nil
-	case pageinfo.FieldURL:
+	case page.FieldURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetURL(v)
 		return nil
-	case pageinfo.FieldCountReferred:
+	case page.FieldCountReferred:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCountReferred(v)
 		return nil
-	case pageinfo.FieldStatus:
-		v, ok := value.(pageinfo.Status)
+	case page.FieldStatus:
+		v, ok := value.(page.Status)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
 		return nil
-	case pageinfo.FieldCreatedAt:
+	case page.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedAt(v)
 		return nil
-	case pageinfo.FieldCreatedBy:
+	case page.FieldCreatedBy:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedBy(v)
 		return nil
-	case pageinfo.FieldUpdatedAt:
+	case page.FieldUpdatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdatedAt(v)
 		return nil
-	case pageinfo.FieldUpdatedBy:
+	case page.FieldUpdatedBy:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdatedBy(v)
 		return nil
-	case pageinfo.FieldTitle:
+	case page.FieldTitle:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTitle(v)
 		return nil
-	case pageinfo.FieldDescription:
+	case page.FieldDescription:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDescription(v)
 		return nil
-	case pageinfo.FieldKeywords:
+	case page.FieldKeywords:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetKeywords(v)
 		return nil
-	case pageinfo.FieldContentLanguage:
+	case page.FieldContentLanguage:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetContentLanguage(v)
 		return nil
-	case pageinfo.FieldTwitterCard:
+	case page.FieldTwitterCard:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTwitterCard(v)
 		return nil
-	case pageinfo.FieldTwitterURL:
+	case page.FieldTwitterURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTwitterURL(v)
 		return nil
-	case pageinfo.FieldTwitterTitle:
+	case page.FieldTwitterTitle:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTwitterTitle(v)
 		return nil
-	case pageinfo.FieldTwitterDescription:
+	case page.FieldTwitterDescription:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTwitterDescription(v)
 		return nil
-	case pageinfo.FieldTwitterImage:
+	case page.FieldTwitterImage:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTwitterImage(v)
 		return nil
-	case pageinfo.FieldOgSiteName:
+	case page.FieldOgSiteName:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgSiteName(v)
 		return nil
-	case pageinfo.FieldOgLocale:
+	case page.FieldOgLocale:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgLocale(v)
 		return nil
-	case pageinfo.FieldOgTitle:
+	case page.FieldOgTitle:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgTitle(v)
 		return nil
-	case pageinfo.FieldOgDescription:
+	case page.FieldOgDescription:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgDescription(v)
 		return nil
-	case pageinfo.FieldOgType:
+	case page.FieldOgType:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgType(v)
 		return nil
-	case pageinfo.FieldOgURL:
+	case page.FieldOgURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgURL(v)
 		return nil
-	case pageinfo.FieldOgImage:
+	case page.FieldOgImage:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgImage(v)
 		return nil
-	case pageinfo.FieldOgImageType:
+	case page.FieldOgImageType:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgImageType(v)
 		return nil
-	case pageinfo.FieldOgImageURL:
+	case page.FieldOgImageURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgImageURL(v)
 		return nil
-	case pageinfo.FieldOgImageSecureURL:
+	case page.FieldOgImageSecureURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgImageSecureURL(v)
 		return nil
-	case pageinfo.FieldOgImageWidth:
+	case page.FieldOgImageWidth:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgImageWidth(v)
 		return nil
-	case pageinfo.FieldOgImageHeight:
+	case page.FieldOgImageHeight:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgImageHeight(v)
 		return nil
-	case pageinfo.FieldOgVideo:
+	case page.FieldOgVideo:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgVideo(v)
 		return nil
-	case pageinfo.FieldOgVideoType:
+	case page.FieldOgVideoType:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgVideoType(v)
 		return nil
-	case pageinfo.FieldOgVideoURL:
+	case page.FieldOgVideoURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgVideoURL(v)
 		return nil
-	case pageinfo.FieldOgVideoSecureURL:
+	case page.FieldOgVideoSecureURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgVideoSecureURL(v)
 		return nil
-	case pageinfo.FieldOgVideoWidth:
+	case page.FieldOgVideoWidth:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOgVideoWidth(v)
 		return nil
-	case pageinfo.FieldOgVideoHeight:
+	case page.FieldOgVideoHeight:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
@@ -2253,15 +2414,15 @@ func (m *PageInfoMutation) SetField(name string, value ent.Value) error {
 		m.SetOgVideoHeight(v)
 		return nil
 	}
-	return fmt.Errorf("unknown PageInfo field %s", name)
+	return fmt.Errorf("unknown Page field %s", name)
 }
 
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
-func (m *PageInfoMutation) AddedFields() []string {
+func (m *PageMutation) AddedFields() []string {
 	var fields []string
 	if m.addcount_referred != nil {
-		fields = append(fields, pageinfo.FieldCountReferred)
+		fields = append(fields, page.FieldCountReferred)
 	}
 	return fields
 }
@@ -2269,9 +2430,9 @@ func (m *PageInfoMutation) AddedFields() []string {
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
-func (m *PageInfoMutation) AddedField(name string) (ent.Value, bool) {
+func (m *PageMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
-	case pageinfo.FieldCountReferred:
+	case page.FieldCountReferred:
 		return m.AddedCountReferred()
 	}
 	return nil, false
@@ -2280,9 +2441,9 @@ func (m *PageInfoMutation) AddedField(name string) (ent.Value, bool) {
 // AddField adds the value to the field with the given name. It returns an error if
 // the field is not defined in the schema, or if the type mismatched the field
 // type.
-func (m *PageInfoMutation) AddField(name string, value ent.Value) error {
+func (m *PageMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case pageinfo.FieldCountReferred:
+	case page.FieldCountReferred:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
@@ -2290,202 +2451,244 @@ func (m *PageInfoMutation) AddField(name string, value ent.Value) error {
 		m.AddCountReferred(v)
 		return nil
 	}
-	return fmt.Errorf("unknown PageInfo numeric field %s", name)
+	return fmt.Errorf("unknown Page numeric field %s", name)
 }
 
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
-func (m *PageInfoMutation) ClearedFields() []string {
+func (m *PageMutation) ClearedFields() []string {
 	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
 // cleared in this mutation.
-func (m *PageInfoMutation) FieldCleared(name string) bool {
+func (m *PageMutation) FieldCleared(name string) bool {
 	_, ok := m.clearedFields[name]
 	return ok
 }
 
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
-func (m *PageInfoMutation) ClearField(name string) error {
-	return fmt.Errorf("unknown PageInfo nullable field %s", name)
+func (m *PageMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown Page nullable field %s", name)
 }
 
 // ResetField resets all changes in the mutation for the field with the given name.
 // It returns an error if the field is not defined in the schema.
-func (m *PageInfoMutation) ResetField(name string) error {
+func (m *PageMutation) ResetField(name string) error {
 	switch name {
-	case pageinfo.FieldDomain:
+	case page.FieldReferredID:
+		m.ResetReferredID()
+		return nil
+	case page.FieldCrawlingVersion:
+		m.ResetCrawlingVersion()
+		return nil
+	case page.FieldDomain:
 		m.ResetDomain()
 		return nil
-	case pageinfo.FieldPort:
+	case page.FieldPort:
 		m.ResetPort()
 		return nil
-	case pageinfo.FieldIsHTTPS:
+	case page.FieldIsHTTPS:
 		m.ResetIsHTTPS()
 		return nil
-	case pageinfo.FieldIndexedURL:
+	case page.FieldIndexedURL:
 		m.ResetIndexedURL()
 		return nil
-	case pageinfo.FieldPath:
+	case page.FieldPath:
 		m.ResetPath()
 		return nil
-	case pageinfo.FieldQuerystring:
+	case page.FieldQuerystring:
 		m.ResetQuerystring()
 		return nil
-	case pageinfo.FieldURL:
+	case page.FieldURL:
 		m.ResetURL()
 		return nil
-	case pageinfo.FieldCountReferred:
+	case page.FieldCountReferred:
 		m.ResetCountReferred()
 		return nil
-	case pageinfo.FieldStatus:
+	case page.FieldStatus:
 		m.ResetStatus()
 		return nil
-	case pageinfo.FieldCreatedAt:
+	case page.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
-	case pageinfo.FieldCreatedBy:
+	case page.FieldCreatedBy:
 		m.ResetCreatedBy()
 		return nil
-	case pageinfo.FieldUpdatedAt:
+	case page.FieldUpdatedAt:
 		m.ResetUpdatedAt()
 		return nil
-	case pageinfo.FieldUpdatedBy:
+	case page.FieldUpdatedBy:
 		m.ResetUpdatedBy()
 		return nil
-	case pageinfo.FieldTitle:
+	case page.FieldTitle:
 		m.ResetTitle()
 		return nil
-	case pageinfo.FieldDescription:
+	case page.FieldDescription:
 		m.ResetDescription()
 		return nil
-	case pageinfo.FieldKeywords:
+	case page.FieldKeywords:
 		m.ResetKeywords()
 		return nil
-	case pageinfo.FieldContentLanguage:
+	case page.FieldContentLanguage:
 		m.ResetContentLanguage()
 		return nil
-	case pageinfo.FieldTwitterCard:
+	case page.FieldTwitterCard:
 		m.ResetTwitterCard()
 		return nil
-	case pageinfo.FieldTwitterURL:
+	case page.FieldTwitterURL:
 		m.ResetTwitterURL()
 		return nil
-	case pageinfo.FieldTwitterTitle:
+	case page.FieldTwitterTitle:
 		m.ResetTwitterTitle()
 		return nil
-	case pageinfo.FieldTwitterDescription:
+	case page.FieldTwitterDescription:
 		m.ResetTwitterDescription()
 		return nil
-	case pageinfo.FieldTwitterImage:
+	case page.FieldTwitterImage:
 		m.ResetTwitterImage()
 		return nil
-	case pageinfo.FieldOgSiteName:
+	case page.FieldOgSiteName:
 		m.ResetOgSiteName()
 		return nil
-	case pageinfo.FieldOgLocale:
+	case page.FieldOgLocale:
 		m.ResetOgLocale()
 		return nil
-	case pageinfo.FieldOgTitle:
+	case page.FieldOgTitle:
 		m.ResetOgTitle()
 		return nil
-	case pageinfo.FieldOgDescription:
+	case page.FieldOgDescription:
 		m.ResetOgDescription()
 		return nil
-	case pageinfo.FieldOgType:
+	case page.FieldOgType:
 		m.ResetOgType()
 		return nil
-	case pageinfo.FieldOgURL:
+	case page.FieldOgURL:
 		m.ResetOgURL()
 		return nil
-	case pageinfo.FieldOgImage:
+	case page.FieldOgImage:
 		m.ResetOgImage()
 		return nil
-	case pageinfo.FieldOgImageType:
+	case page.FieldOgImageType:
 		m.ResetOgImageType()
 		return nil
-	case pageinfo.FieldOgImageURL:
+	case page.FieldOgImageURL:
 		m.ResetOgImageURL()
 		return nil
-	case pageinfo.FieldOgImageSecureURL:
+	case page.FieldOgImageSecureURL:
 		m.ResetOgImageSecureURL()
 		return nil
-	case pageinfo.FieldOgImageWidth:
+	case page.FieldOgImageWidth:
 		m.ResetOgImageWidth()
 		return nil
-	case pageinfo.FieldOgImageHeight:
+	case page.FieldOgImageHeight:
 		m.ResetOgImageHeight()
 		return nil
-	case pageinfo.FieldOgVideo:
+	case page.FieldOgVideo:
 		m.ResetOgVideo()
 		return nil
-	case pageinfo.FieldOgVideoType:
+	case page.FieldOgVideoType:
 		m.ResetOgVideoType()
 		return nil
-	case pageinfo.FieldOgVideoURL:
+	case page.FieldOgVideoURL:
 		m.ResetOgVideoURL()
 		return nil
-	case pageinfo.FieldOgVideoSecureURL:
+	case page.FieldOgVideoSecureURL:
 		m.ResetOgVideoSecureURL()
 		return nil
-	case pageinfo.FieldOgVideoWidth:
+	case page.FieldOgVideoWidth:
 		m.ResetOgVideoWidth()
 		return nil
-	case pageinfo.FieldOgVideoHeight:
+	case page.FieldOgVideoHeight:
 		m.ResetOgVideoHeight()
 		return nil
 	}
-	return fmt.Errorf("unknown PageInfo field %s", name)
+	return fmt.Errorf("unknown Page field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
-func (m *PageInfoMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *PageMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.page_source != nil {
+		edges = append(edges, page.EdgePageSource)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
-func (m *PageInfoMutation) AddedIDs(name string) []ent.Value {
+func (m *PageMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case page.EdgePageSource:
+		ids := make([]ent.Value, 0, len(m.page_source))
+		for id := range m.page_source {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
-func (m *PageInfoMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *PageMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.removedpage_source != nil {
+		edges = append(edges, page.EdgePageSource)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
-func (m *PageInfoMutation) RemovedIDs(name string) []ent.Value {
+func (m *PageMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case page.EdgePageSource:
+		ids := make([]ent.Value, 0, len(m.removedpage_source))
+		for id := range m.removedpage_source {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
-func (m *PageInfoMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *PageMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedpage_source {
+		edges = append(edges, page.EdgePageSource)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
-func (m *PageInfoMutation) EdgeCleared(name string) bool {
+func (m *PageMutation) EdgeCleared(name string) bool {
+	switch name {
+	case page.EdgePageSource:
+		return m.clearedpage_source
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
-func (m *PageInfoMutation) ClearEdge(name string) error {
-	return fmt.Errorf("unknown PageInfo unique edge %s", name)
+func (m *PageMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Page unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
-func (m *PageInfoMutation) ResetEdge(name string) error {
-	return fmt.Errorf("unknown PageInfo edge %s", name)
+func (m *PageMutation) ResetEdge(name string) error {
+	switch name {
+	case page.EdgePageSource:
+		m.ResetPageSource()
+		return nil
+	}
+	return fmt.Errorf("unknown Page edge %s", name)
 }
 
 // PageLinkMutation represents an operation that mutates the PageLink nodes in the graph.
@@ -3142,4 +3345,590 @@ func (m *PageLinkMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *PageLinkMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown PageLink edge %s", name)
+}
+
+// PageSourceMutation represents an operation that mutates the PageSource nodes in the graph.
+type PageSourceMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *string
+	referred_page_id *string
+	url              *string
+	referred_url     *string
+	source           *string
+	clearedFields    map[string]struct{}
+	page             *string
+	clearedpage      bool
+	done             bool
+	oldValue         func(context.Context) (*PageSource, error)
+	predicates       []predicate.PageSource
+}
+
+var _ ent.Mutation = (*PageSourceMutation)(nil)
+
+// pagesourceOption allows management of the mutation configuration using functional options.
+type pagesourceOption func(*PageSourceMutation)
+
+// newPageSourceMutation creates new mutation for the PageSource entity.
+func newPageSourceMutation(c config, op Op, opts ...pagesourceOption) *PageSourceMutation {
+	m := &PageSourceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePageSource,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPageSourceID sets the ID field of the mutation.
+func withPageSourceID(id string) pagesourceOption {
+	return func(m *PageSourceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PageSource
+		)
+		m.oldValue = func(ctx context.Context) (*PageSource, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PageSource.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPageSource sets the old PageSource of the mutation.
+func withPageSource(node *PageSource) pagesourceOption {
+	return func(m *PageSourceMutation) {
+		m.oldValue = func(context.Context) (*PageSource, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PageSourceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PageSourceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PageSource entities.
+func (m *PageSourceMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PageSourceMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PageSourceMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PageSource.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetPageID sets the "page_id" field.
+func (m *PageSourceMutation) SetPageID(s string) {
+	m.page = &s
+}
+
+// PageID returns the value of the "page_id" field in the mutation.
+func (m *PageSourceMutation) PageID() (r string, exists bool) {
+	v := m.page
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPageID returns the old "page_id" field's value of the PageSource entity.
+// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PageSourceMutation) OldPageID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPageID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPageID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPageID: %w", err)
+	}
+	return oldValue.PageID, nil
+}
+
+// ResetPageID resets all changes to the "page_id" field.
+func (m *PageSourceMutation) ResetPageID() {
+	m.page = nil
+}
+
+// SetReferredPageID sets the "referred_page_id" field.
+func (m *PageSourceMutation) SetReferredPageID(s string) {
+	m.referred_page_id = &s
+}
+
+// ReferredPageID returns the value of the "referred_page_id" field in the mutation.
+func (m *PageSourceMutation) ReferredPageID() (r string, exists bool) {
+	v := m.referred_page_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferredPageID returns the old "referred_page_id" field's value of the PageSource entity.
+// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PageSourceMutation) OldReferredPageID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferredPageID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferredPageID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferredPageID: %w", err)
+	}
+	return oldValue.ReferredPageID, nil
+}
+
+// ResetReferredPageID resets all changes to the "referred_page_id" field.
+func (m *PageSourceMutation) ResetReferredPageID() {
+	m.referred_page_id = nil
+}
+
+// SetURL sets the "url" field.
+func (m *PageSourceMutation) SetURL(s string) {
+	m.url = &s
+}
+
+// URL returns the value of the "url" field in the mutation.
+func (m *PageSourceMutation) URL() (r string, exists bool) {
+	v := m.url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldURL returns the old "url" field's value of the PageSource entity.
+// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PageSourceMutation) OldURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldURL: %w", err)
+	}
+	return oldValue.URL, nil
+}
+
+// ResetURL resets all changes to the "url" field.
+func (m *PageSourceMutation) ResetURL() {
+	m.url = nil
+}
+
+// SetReferredURL sets the "referred_url" field.
+func (m *PageSourceMutation) SetReferredURL(s string) {
+	m.referred_url = &s
+}
+
+// ReferredURL returns the value of the "referred_url" field in the mutation.
+func (m *PageSourceMutation) ReferredURL() (r string, exists bool) {
+	v := m.referred_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferredURL returns the old "referred_url" field's value of the PageSource entity.
+// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PageSourceMutation) OldReferredURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferredURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferredURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferredURL: %w", err)
+	}
+	return oldValue.ReferredURL, nil
+}
+
+// ResetReferredURL resets all changes to the "referred_url" field.
+func (m *PageSourceMutation) ResetReferredURL() {
+	m.referred_url = nil
+}
+
+// SetSource sets the "source" field.
+func (m *PageSourceMutation) SetSource(s string) {
+	m.source = &s
+}
+
+// Source returns the value of the "source" field in the mutation.
+func (m *PageSourceMutation) Source() (r string, exists bool) {
+	v := m.source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSource returns the old "source" field's value of the PageSource entity.
+// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PageSourceMutation) OldSource(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSource is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSource requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSource: %w", err)
+	}
+	return oldValue.Source, nil
+}
+
+// ResetSource resets all changes to the "source" field.
+func (m *PageSourceMutation) ResetSource() {
+	m.source = nil
+}
+
+// ClearPage clears the "page" edge to the Page entity.
+func (m *PageSourceMutation) ClearPage() {
+	m.clearedpage = true
+}
+
+// PageCleared reports if the "page" edge to the Page entity was cleared.
+func (m *PageSourceMutation) PageCleared() bool {
+	return m.clearedpage
+}
+
+// PageIDs returns the "page" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PageID instead. It exists only for internal usage by the builders.
+func (m *PageSourceMutation) PageIDs() (ids []string) {
+	if id := m.page; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPage resets all changes to the "page" edge.
+func (m *PageSourceMutation) ResetPage() {
+	m.page = nil
+	m.clearedpage = false
+}
+
+// Where appends a list predicates to the PageSourceMutation builder.
+func (m *PageSourceMutation) Where(ps ...predicate.PageSource) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// Op returns the operation name.
+func (m *PageSourceMutation) Op() Op {
+	return m.op
+}
+
+// Type returns the node type of this mutation (PageSource).
+func (m *PageSourceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PageSourceMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.page != nil {
+		fields = append(fields, pagesource.FieldPageID)
+	}
+	if m.referred_page_id != nil {
+		fields = append(fields, pagesource.FieldReferredPageID)
+	}
+	if m.url != nil {
+		fields = append(fields, pagesource.FieldURL)
+	}
+	if m.referred_url != nil {
+		fields = append(fields, pagesource.FieldReferredURL)
+	}
+	if m.source != nil {
+		fields = append(fields, pagesource.FieldSource)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PageSourceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case pagesource.FieldPageID:
+		return m.PageID()
+	case pagesource.FieldReferredPageID:
+		return m.ReferredPageID()
+	case pagesource.FieldURL:
+		return m.URL()
+	case pagesource.FieldReferredURL:
+		return m.ReferredURL()
+	case pagesource.FieldSource:
+		return m.Source()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PageSourceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case pagesource.FieldPageID:
+		return m.OldPageID(ctx)
+	case pagesource.FieldReferredPageID:
+		return m.OldReferredPageID(ctx)
+	case pagesource.FieldURL:
+		return m.OldURL(ctx)
+	case pagesource.FieldReferredURL:
+		return m.OldReferredURL(ctx)
+	case pagesource.FieldSource:
+		return m.OldSource(ctx)
+	}
+	return nil, fmt.Errorf("unknown PageSource field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PageSourceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case pagesource.FieldPageID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPageID(v)
+		return nil
+	case pagesource.FieldReferredPageID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferredPageID(v)
+		return nil
+	case pagesource.FieldURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetURL(v)
+		return nil
+	case pagesource.FieldReferredURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferredURL(v)
+		return nil
+	case pagesource.FieldSource:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSource(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PageSource field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PageSourceMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PageSourceMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PageSourceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PageSource numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PageSourceMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PageSourceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PageSourceMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PageSource nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PageSourceMutation) ResetField(name string) error {
+	switch name {
+	case pagesource.FieldPageID:
+		m.ResetPageID()
+		return nil
+	case pagesource.FieldReferredPageID:
+		m.ResetReferredPageID()
+		return nil
+	case pagesource.FieldURL:
+		m.ResetURL()
+		return nil
+	case pagesource.FieldReferredURL:
+		m.ResetReferredURL()
+		return nil
+	case pagesource.FieldSource:
+		m.ResetSource()
+		return nil
+	}
+	return fmt.Errorf("unknown PageSource field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PageSourceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.page != nil {
+		edges = append(edges, pagesource.EdgePage)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PageSourceMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case pagesource.EdgePage:
+		if id := m.page; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PageSourceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PageSourceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PageSourceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedpage {
+		edges = append(edges, pagesource.EdgePage)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PageSourceMutation) EdgeCleared(name string) bool {
+	switch name {
+	case pagesource.EdgePage:
+		return m.clearedpage
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PageSourceMutation) ClearEdge(name string) error {
+	switch name {
+	case pagesource.EdgePage:
+		m.ClearPage()
+		return nil
+	}
+	return fmt.Errorf("unknown PageSource unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PageSourceMutation) ResetEdge(name string) error {
+	switch name {
+	case pagesource.EdgePage:
+		m.ResetPage()
+		return nil
+	}
+	return fmt.Errorf("unknown PageSource edge %s", name)
 }

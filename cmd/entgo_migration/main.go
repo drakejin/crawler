@@ -1,9 +1,10 @@
 package main
 
 import (
+	"github.com/rs/zerolog/log"
+
 	edgemysql "github.com/drakejin/crawler/edge/mysql"
 	storagedb "github.com/drakejin/crawler/internal/storage/db"
-	"github.com/rs/zerolog/log"
 )
 
 func main() {

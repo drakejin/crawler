@@ -9,9 +9,11 @@ import (
 )
 
 var (
-	// PageInfoColumns holds the columns for the "page_info" table.
-	PageInfoColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt64, Increment: true},
+	// PageColumns holds the columns for the "page" table.
+	PageColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "referred_id", Type: field.TypeString},
+		{Name: "crawling_version", Type: field.TypeString},
 		{Name: "domain", Type: field.TypeString, Unique: true, Size: 700},
 		{Name: "port", Type: field.TypeString, Size: 30, Default: "80"},
 		{Name: "is_https", Type: field.TypeBool, Default: false},
@@ -53,11 +55,23 @@ var (
 		{Name: "og_video_width", Type: field.TypeString, Default: ""},
 		{Name: "og_video_height", Type: field.TypeString, Default: ""},
 	}
-	// PageInfoTable holds the schema information for the "page_info" table.
-	PageInfoTable = &schema.Table{
-		Name:       "page_info",
-		Columns:    PageInfoColumns,
-		PrimaryKey: []*schema.Column{PageInfoColumns[0]},
+	// PageTable holds the schema information for the "page" table.
+	PageTable = &schema.Table{
+		Name:       "page",
+		Columns:    PageColumns,
+		PrimaryKey: []*schema.Column{PageColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "page_crawling_version",
+				Unique:  false,
+				Columns: []*schema.Column{PageColumns[2]},
+			},
+			{
+				Name:    "page_referred_id",
+				Unique:  false,
+				Columns: []*schema.Column{PageColumns[1]},
+			},
+		},
 	}
 	// PageLinksColumns holds the columns for the "page_links" table.
 	PageLinksColumns = []*schema.Column{
@@ -92,21 +106,51 @@ var (
 			},
 		},
 	}
+	// PageSourceColumns holds the columns for the "page_source" table.
+	PageSourceColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "referred_page_id", Type: field.TypeString},
+		{Name: "url", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
+		{Name: "referred_url", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
+		{Name: "source", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
+		{Name: "page_id", Type: field.TypeString},
+	}
+	// PageSourceTable holds the schema information for the "page_source" table.
+	PageSourceTable = &schema.Table{
+		Name:       "page_source",
+		Columns:    PageSourceColumns,
+		PrimaryKey: []*schema.Column{PageSourceColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "page_source_page_page_source",
+				Columns:    []*schema.Column{PageSourceColumns[5]},
+				RefColumns: []*schema.Column{PageColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
-		PageInfoTable,
+		PageTable,
 		PageLinksTable,
+		PageSourceTable,
 	}
 )
 
 func init() {
-	PageInfoTable.Annotation = &entsql.Annotation{
-		Table:     "page_info",
+	PageTable.Annotation = &entsql.Annotation{
+		Table:     "page",
 		Charset:   "utf8mb4",
 		Collation: "utf8mb4_0900_ai_ci",
 	}
 	PageLinksTable.Annotation = &entsql.Annotation{
 		Table:     "page_links",
+		Charset:   "utf8mb4",
+		Collation: "utf8mb4_0900_ai_ci",
+	}
+	PageSourceTable.ForeignKeys[0].RefTable = PageTable
+	PageSourceTable.Annotation = &entsql.Annotation{
+		Table:     "page_source",
 		Charset:   "utf8mb4",
 		Collation: "utf8mb4_0900_ai_ci",
 	}

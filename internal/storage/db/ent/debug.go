@@ -4,12 +4,12 @@ package ent
 
 import "entgo.io/ent/dialect"
 
-func (c *PageInfoClient) Debug() *PageInfoClient {
+func (c *PageClient) Debug() *PageClient {
 	if c.debug {
 		return c
 	}
 	cfg := config{driver: dialect.Debug(c.driver, c.log), log: c.log, debug: true, hooks: c.hooks}
-	return &PageInfoClient{config: cfg}
+	return &PageClient{config: cfg}
 }
 
 func (c *PageLinkClient) Debug() *PageLinkClient {
@@ -18,4 +18,12 @@ func (c *PageLinkClient) Debug() *PageLinkClient {
 	}
 	cfg := config{driver: dialect.Debug(c.driver, c.log), log: c.log, debug: true, hooks: c.hooks}
 	return &PageLinkClient{config: cfg}
+}
+
+func (c *PageSourceClient) Debug() *PageSourceClient {
+	if c.debug {
+		return c
+	}
+	cfg := config{driver: dialect.Debug(c.driver, c.log), log: c.log, debug: true, hooks: c.hooks}
+	return &PageSourceClient{config: cfg}
 }

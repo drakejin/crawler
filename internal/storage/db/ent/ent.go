@@ -10,8 +10,9 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"github.com/drakejin/crawler/internal/storage/db/ent/pageinfo"
+	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagelink"
+	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -32,8 +33,9 @@ type OrderFunc func(*sql.Selector)
 // columnChecker returns a function indicates if the column exists in the given column.
 func columnChecker(table string) func(string) error {
 	checks := map[string]func(string) bool{
-		pageinfo.Table: pageinfo.ValidColumn,
-		pagelink.Table: pagelink.ValidColumn,
+		page.Table:       page.ValidColumn,
+		pagelink.Table:   pagelink.ValidColumn,
+		pagesource.Table: pagesource.ValidColumn,
 	}
 	check, ok := checks[table]
 	if !ok {

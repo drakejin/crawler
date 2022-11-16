@@ -10,11 +10,13 @@ import (
 
 	"github.com/drakejin/crawler/internal/storage/db/ent/migrate"
 
-	"github.com/drakejin/crawler/internal/storage/db/ent/pageinfo"
+	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagelink"
+	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 // Client is the client that holds all ent builders.
@@ -22,10 +24,12 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
-	// PageInfo is the client for interacting with the PageInfo builders.
-	PageInfo *PageInfoClient
+	// Page is the client for interacting with the Page builders.
+	Page *PageClient
 	// PageLink is the client for interacting with the PageLink builders.
 	PageLink *PageLinkClient
+	// PageSource is the client for interacting with the PageSource builders.
+	PageSource *PageSourceClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -39,8 +43,9 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
-	c.PageInfo = NewPageInfoClient(c.config)
+	c.Page = NewPageClient(c.config)
 	c.PageLink = NewPageLinkClient(c.config)
+	c.PageSource = NewPageSourceClient(c.config)
 }
 
 // Open opens a database/sql.DB specified by the driver name and
@@ -72,10 +77,11 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:      ctx,
-		config:   cfg,
-		PageInfo: NewPageInfoClient(cfg),
-		PageLink: NewPageLinkClient(cfg),
+		ctx:        ctx,
+		config:     cfg,
+		Page:       NewPageClient(cfg),
+		PageLink:   NewPageLinkClient(cfg),
+		PageSource: NewPageSourceClient(cfg),
 	}, nil
 }
 
@@ -93,17 +99,18 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:      ctx,
-		config:   cfg,
-		PageInfo: NewPageInfoClient(cfg),
-		PageLink: NewPageLinkClient(cfg),
+		ctx:        ctx,
+		config:     cfg,
+		Page:       NewPageClient(cfg),
+		PageLink:   NewPageLinkClient(cfg),
+		PageSource: NewPageSourceClient(cfg),
 	}, nil
 }
 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		PageInfo.
+//		Page.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -125,88 +132,89 @@ func (c *Client) Close() error {
 // Use adds the mutation hooks to all the entity clients.
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
-	c.PageInfo.Use(hooks...)
+	c.Page.Use(hooks...)
 	c.PageLink.Use(hooks...)
+	c.PageSource.Use(hooks...)
 }
 
-// PageInfoClient is a client for the PageInfo schema.
-type PageInfoClient struct {
+// PageClient is a client for the Page schema.
+type PageClient struct {
 	config
 }
 
-// NewPageInfoClient returns a client for the PageInfo from the given config.
-func NewPageInfoClient(c config) *PageInfoClient {
-	return &PageInfoClient{config: c}
+// NewPageClient returns a client for the Page from the given config.
+func NewPageClient(c config) *PageClient {
+	return &PageClient{config: c}
 }
 
 // Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `pageinfo.Hooks(f(g(h())))`.
-func (c *PageInfoClient) Use(hooks ...Hook) {
-	c.hooks.PageInfo = append(c.hooks.PageInfo, hooks...)
+// A call to `Use(f, g, h)` equals to `page.Hooks(f(g(h())))`.
+func (c *PageClient) Use(hooks ...Hook) {
+	c.hooks.Page = append(c.hooks.Page, hooks...)
 }
 
-// Create returns a builder for creating a PageInfo entity.
-func (c *PageInfoClient) Create() *PageInfoCreate {
-	mutation := newPageInfoMutation(c.config, OpCreate)
-	return &PageInfoCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Create returns a builder for creating a Page entity.
+func (c *PageClient) Create() *PageCreate {
+	mutation := newPageMutation(c.config, OpCreate)
+	return &PageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
-// CreateBulk returns a builder for creating a bulk of PageInfo entities.
-func (c *PageInfoClient) CreateBulk(builders ...*PageInfoCreate) *PageInfoCreateBulk {
-	return &PageInfoCreateBulk{config: c.config, builders: builders}
+// CreateBulk returns a builder for creating a bulk of Page entities.
+func (c *PageClient) CreateBulk(builders ...*PageCreate) *PageCreateBulk {
+	return &PageCreateBulk{config: c.config, builders: builders}
 }
 
-// Update returns an update builder for PageInfo.
-func (c *PageInfoClient) Update() *PageInfoUpdate {
-	mutation := newPageInfoMutation(c.config, OpUpdate)
-	return &PageInfoUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Update returns an update builder for Page.
+func (c *PageClient) Update() *PageUpdate {
+	mutation := newPageMutation(c.config, OpUpdate)
+	return &PageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // UpdateOne returns an update builder for the given entity.
-func (c *PageInfoClient) UpdateOne(pi *PageInfo) *PageInfoUpdateOne {
-	mutation := newPageInfoMutation(c.config, OpUpdateOne, withPageInfo(pi))
-	return &PageInfoUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+func (c *PageClient) UpdateOne(pa *Page) *PageUpdateOne {
+	mutation := newPageMutation(c.config, OpUpdateOne, withPage(pa))
+	return &PageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // UpdateOneID returns an update builder for the given id.
-func (c *PageInfoClient) UpdateOneID(id int64) *PageInfoUpdateOne {
-	mutation := newPageInfoMutation(c.config, OpUpdateOne, withPageInfoID(id))
-	return &PageInfoUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+func (c *PageClient) UpdateOneID(id string) *PageUpdateOne {
+	mutation := newPageMutation(c.config, OpUpdateOne, withPageID(id))
+	return &PageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
-// Delete returns a delete builder for PageInfo.
-func (c *PageInfoClient) Delete() *PageInfoDelete {
-	mutation := newPageInfoMutation(c.config, OpDelete)
-	return &PageInfoDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Delete returns a delete builder for Page.
+func (c *PageClient) Delete() *PageDelete {
+	mutation := newPageMutation(c.config, OpDelete)
+	return &PageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // DeleteOne returns a builder for deleting the given entity.
-func (c *PageInfoClient) DeleteOne(pi *PageInfo) *PageInfoDeleteOne {
-	return c.DeleteOneID(pi.ID)
+func (c *PageClient) DeleteOne(pa *Page) *PageDeleteOne {
+	return c.DeleteOneID(pa.ID)
 }
 
 // DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *PageInfoClient) DeleteOneID(id int64) *PageInfoDeleteOne {
-	builder := c.Delete().Where(pageinfo.ID(id))
+func (c *PageClient) DeleteOneID(id string) *PageDeleteOne {
+	builder := c.Delete().Where(page.ID(id))
 	builder.mutation.id = &id
 	builder.mutation.op = OpDeleteOne
-	return &PageInfoDeleteOne{builder}
+	return &PageDeleteOne{builder}
 }
 
-// Query returns a query builder for PageInfo.
-func (c *PageInfoClient) Query() *PageInfoQuery {
-	return &PageInfoQuery{
+// Query returns a query builder for Page.
+func (c *PageClient) Query() *PageQuery {
+	return &PageQuery{
 		config: c.config,
 	}
 }
 
-// Get returns a PageInfo entity by its id.
-func (c *PageInfoClient) Get(ctx context.Context, id int64) (*PageInfo, error) {
-	return c.Query().Where(pageinfo.ID(id)).Only(ctx)
+// Get returns a Page entity by its id.
+func (c *PageClient) Get(ctx context.Context, id string) (*Page, error) {
+	return c.Query().Where(page.ID(id)).Only(ctx)
 }
 
 // GetX is like Get, but panics if an error occurs.
-func (c *PageInfoClient) GetX(ctx context.Context, id int64) *PageInfo {
+func (c *PageClient) GetX(ctx context.Context, id string) *Page {
 	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
@@ -214,9 +222,26 @@ func (c *PageInfoClient) GetX(ctx context.Context, id int64) *PageInfo {
 	return obj
 }
 
+// QueryPageSource queries the page_source edge of a Page.
+func (c *PageClient) QueryPageSource(pa *Page) *PageSourceQuery {
+	query := &PageSourceQuery{config: c.config}
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pa.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(page.Table, page.FieldID, id),
+			sqlgraph.To(pagesource.Table, pagesource.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, page.PageSourceTable, page.PageSourceColumn),
+		)
+		fromV = sqlgraph.Neighbors(pa.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
-func (c *PageInfoClient) Hooks() []Hook {
-	return c.hooks.PageInfo
+func (c *PageClient) Hooks() []Hook {
+	hooks := c.hooks.Page
+	return append(hooks[:len(hooks):len(hooks)], page.Hooks[:]...)
 }
 
 // PageLinkClient is a client for the PageLink schema.
@@ -307,4 +332,111 @@ func (c *PageLinkClient) GetX(ctx context.Context, id int64) *PageLink {
 // Hooks returns the client hooks.
 func (c *PageLinkClient) Hooks() []Hook {
 	return c.hooks.PageLink
+}
+
+// PageSourceClient is a client for the PageSource schema.
+type PageSourceClient struct {
+	config
+}
+
+// NewPageSourceClient returns a client for the PageSource from the given config.
+func NewPageSourceClient(c config) *PageSourceClient {
+	return &PageSourceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `pagesource.Hooks(f(g(h())))`.
+func (c *PageSourceClient) Use(hooks ...Hook) {
+	c.hooks.PageSource = append(c.hooks.PageSource, hooks...)
+}
+
+// Create returns a builder for creating a PageSource entity.
+func (c *PageSourceClient) Create() *PageSourceCreate {
+	mutation := newPageSourceMutation(c.config, OpCreate)
+	return &PageSourceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PageSource entities.
+func (c *PageSourceClient) CreateBulk(builders ...*PageSourceCreate) *PageSourceCreateBulk {
+	return &PageSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PageSource.
+func (c *PageSourceClient) Update() *PageSourceUpdate {
+	mutation := newPageSourceMutation(c.config, OpUpdate)
+	return &PageSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PageSourceClient) UpdateOne(ps *PageSource) *PageSourceUpdateOne {
+	mutation := newPageSourceMutation(c.config, OpUpdateOne, withPageSource(ps))
+	return &PageSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PageSourceClient) UpdateOneID(id string) *PageSourceUpdateOne {
+	mutation := newPageSourceMutation(c.config, OpUpdateOne, withPageSourceID(id))
+	return &PageSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PageSource.
+func (c *PageSourceClient) Delete() *PageSourceDelete {
+	mutation := newPageSourceMutation(c.config, OpDelete)
+	return &PageSourceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PageSourceClient) DeleteOne(ps *PageSource) *PageSourceDeleteOne {
+	return c.DeleteOneID(ps.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PageSourceClient) DeleteOneID(id string) *PageSourceDeleteOne {
+	builder := c.Delete().Where(pagesource.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PageSourceDeleteOne{builder}
+}
+
+// Query returns a query builder for PageSource.
+func (c *PageSourceClient) Query() *PageSourceQuery {
+	return &PageSourceQuery{
+		config: c.config,
+	}
+}
+
+// Get returns a PageSource entity by its id.
+func (c *PageSourceClient) Get(ctx context.Context, id string) (*PageSource, error) {
+	return c.Query().Where(pagesource.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PageSourceClient) GetX(ctx context.Context, id string) *PageSource {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPage queries the page edge of a PageSource.
+func (c *PageSourceClient) QueryPage(ps *PageSource) *PageQuery {
+	query := &PageQuery{config: c.config}
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ps.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(pagesource.Table, pagesource.FieldID, id),
+			sqlgraph.To(page.Table, page.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, pagesource.PageTable, pagesource.PageColumn),
+		)
+		fromV = sqlgraph.Neighbors(ps.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PageSourceClient) Hooks() []Hook {
+	hooks := c.hooks.PageSource
+	return append(hooks[:len(hooks):len(hooks)], pagesource.Hooks[:]...)
 }

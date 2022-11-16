@@ -9,15 +9,15 @@ import (
 	"github.com/drakejin/crawler/internal/storage/db/ent"
 )
 
-// The PageInfoFunc type is an adapter to allow the use of ordinary
-// function as PageInfo mutator.
-type PageInfoFunc func(context.Context, *ent.PageInfoMutation) (ent.Value, error)
+// The PageFunc type is an adapter to allow the use of ordinary
+// function as Page mutator.
+type PageFunc func(context.Context, *ent.PageMutation) (ent.Value, error)
 
 // Mutate calls f(ctx, m).
-func (f PageInfoFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	mv, ok := m.(*ent.PageInfoMutation)
+func (f PageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	mv, ok := m.(*ent.PageMutation)
 	if !ok {
-		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PageInfoMutation", m)
+		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PageMutation", m)
 	}
 	return f(ctx, mv)
 }
@@ -31,6 +31,19 @@ func (f PageLinkFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 	mv, ok := m.(*ent.PageLinkMutation)
 	if !ok {
 		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PageLinkMutation", m)
+	}
+	return f(ctx, mv)
+}
+
+// The PageSourceFunc type is an adapter to allow the use of ordinary
+// function as PageSource mutator.
+type PageSourceFunc func(context.Context, *ent.PageSourceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PageSourceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	mv, ok := m.(*ent.PageSourceMutation)
+	if !ok {
+		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PageSourceMutation", m)
 	}
 	return f(ctx, mv)
 }

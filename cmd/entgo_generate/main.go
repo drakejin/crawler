@@ -1,15 +1,12 @@
-//go:build ignore
-// +build ignore
-
 package main
 
 import (
-	"log"
 	"strings"
 	"text/template"
 
 	"entgo.io/ent/entc"
 	"entgo.io/ent/entc/gen"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -25,6 +22,6 @@ func main() {
 		},
 	})
 	if err != nil {
-		log.Fatal().Msgf("running ent codegen: %v", err)
+		log.Fatal().Err(err).Send()
 	}
 }
