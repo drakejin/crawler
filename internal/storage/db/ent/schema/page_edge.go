@@ -1,28 +1,31 @@
 package schema
 
 import (
+	"time"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/google/uuid"
+
 	"github.com/drakejin/crawler/internal/storage/db/ent/validate"
-	"time"
 )
 
-// PageLink holds the schema definition for the Keyword entity.
-type PageLink struct {
+// PageReferred holds the schema definition for the Keyword entity.
+type PageReferred struct {
 	ent.Schema
 }
 
 // Fields of the Word.
-func (PageLink) Fields() []ent.Field {
+func (PageReferred) Fields() []ent.Field {
 	return []ent.Field{
-		field.Int64("id").Unique(),
+		field.UUID("id", uuid.UUID{}).Unique(),
 
-		field.Int64("source_id"),
-		field.Int64("target_id"),
+		field.UUID("source_id", uuid.UUID{}),
+		field.UUID("target_id", uuid.UUID{}),
 
 		field.Time("created_at").
 			Default(time.Now().UTC).
@@ -63,27 +66,18 @@ func (PageLink) Fields() []ent.Field {
 }
 
 // Edges of the Word.
-func (PageLink) Edges() []ent.Edge {
-	return []ent.Edge{
-		//edge.From("page_info", PageInfo.Type).
-		//	Ref("page_link").
-		//	Field("source_id").
-		//	Required(),
-		//edge.From("page_info", PageInfo.Type).
-		//	Ref("page_link").
-		//	Field("target_id").
-		//	Required(),
-	}
+func (PageReferred) Edges() []ent.Edge {
+	return []ent.Edge{}
 }
 
 // Indexes of the Word
-func (PageLink) Indexes() []ent.Index {
+func (PageReferred) Indexes() []ent.Index {
 	return []ent.Index{
 		// unique index.
 		index.
 			Fields("source_id", "target_id").
+			StorageKey("ux_source_id_and_target_id").
 			Unique(),
-		// unique index.
 		index.
 			Fields("source_id"),
 		index.
@@ -92,10 +86,10 @@ func (PageLink) Indexes() []ent.Index {
 }
 
 // Annotations of the Word.
-func (PageLink) Annotations() []schema.Annotation {
+func (PageReferred) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
-			Table:     "page_links",
+			Table:     "page_referred",
 			Charset:   "utf8mb4",
 			Collation: "utf8mb4_0900_ai_ci",
 		},

@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
+	"github.com/google/uuid"
 )
 
 // PageCreate is the builder for creating a Page entity.
@@ -22,12 +23,6 @@ type PageCreate struct {
 	mutation *PageMutation
 	hooks    []Hook
 	conflict []sql.ConflictOption
-}
-
-// SetReferredID sets the "referred_id" field.
-func (pc *PageCreate) SetReferredID(s string) *PageCreate {
-	pc.mutation.SetReferredID(s)
-	return pc
 }
 
 // SetCrawlingVersion sets the "crawling_version" field.
@@ -70,17 +65,9 @@ func (pc *PageCreate) SetNillableIsHTTPS(b *bool) *PageCreate {
 	return pc
 }
 
-// SetIndexedURL sets the "indexed_url" field.
-func (pc *PageCreate) SetIndexedURL(s string) *PageCreate {
-	pc.mutation.SetIndexedURL(s)
-	return pc
-}
-
-// SetNillableIndexedURL sets the "indexed_url" field if the given value is not nil.
-func (pc *PageCreate) SetNillableIndexedURL(s *string) *PageCreate {
-	if s != nil {
-		pc.SetIndexedURL(*s)
-	}
+// SetURL sets the "url" field.
+func (pc *PageCreate) SetURL(s string) *PageCreate {
+	pc.mutation.SetURL(s)
 	return pc
 }
 
@@ -108,20 +95,6 @@ func (pc *PageCreate) SetQuerystring(s string) *PageCreate {
 func (pc *PageCreate) SetNillableQuerystring(s *string) *PageCreate {
 	if s != nil {
 		pc.SetQuerystring(*s)
-	}
-	return pc
-}
-
-// SetURL sets the "url" field.
-func (pc *PageCreate) SetURL(s string) *PageCreate {
-	pc.mutation.SetURL(s)
-	return pc
-}
-
-// SetNillableURL sets the "url" field if the given value is not nil.
-func (pc *PageCreate) SetNillableURL(s *string) *PageCreate {
-	if s != nil {
-		pc.SetURL(*s)
 	}
 	return pc
 }
@@ -573,20 +546,20 @@ func (pc *PageCreate) SetNillableOgVideoHeight(s *string) *PageCreate {
 }
 
 // SetID sets the "id" field.
-func (pc *PageCreate) SetID(s string) *PageCreate {
-	pc.mutation.SetID(s)
+func (pc *PageCreate) SetID(u uuid.UUID) *PageCreate {
+	pc.mutation.SetID(u)
 	return pc
 }
 
 // AddPageSourceIDs adds the "page_source" edge to the PageSource entity by IDs.
-func (pc *PageCreate) AddPageSourceIDs(ids ...string) *PageCreate {
+func (pc *PageCreate) AddPageSourceIDs(ids ...uuid.UUID) *PageCreate {
 	pc.mutation.AddPageSourceIDs(ids...)
 	return pc
 }
 
 // AddPageSource adds the "page_source" edges to the PageSource entity.
 func (pc *PageCreate) AddPageSource(p ...*PageSource) *PageCreate {
-	ids := make([]string, len(p))
+	ids := make([]uuid.UUID, len(p))
 	for i := range p {
 		ids[i] = p[i].ID
 	}
@@ -604,9 +577,7 @@ func (pc *PageCreate) Save(ctx context.Context) (*Page, error) {
 		err  error
 		node *Page
 	)
-	if err := pc.defaults(); err != nil {
-		return nil, err
-	}
+	pc.defaults()
 	if len(pc.hooks) == 0 {
 		if err = pc.check(); err != nil {
 			return nil, err
@@ -671,7 +642,7 @@ func (pc *PageCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (pc *PageCreate) defaults() error {
+func (pc *PageCreate) defaults() {
 	if _, ok := pc.mutation.Port(); !ok {
 		v := page.DefaultPort
 		pc.mutation.SetPort(v)
@@ -680,10 +651,6 @@ func (pc *PageCreate) defaults() error {
 		v := page.DefaultIsHTTPS
 		pc.mutation.SetIsHTTPS(v)
 	}
-	if _, ok := pc.mutation.IndexedURL(); !ok {
-		v := page.DefaultIndexedURL
-		pc.mutation.SetIndexedURL(v)
-	}
 	if _, ok := pc.mutation.Path(); !ok {
 		v := page.DefaultPath
 		pc.mutation.SetPath(v)
@@ -691,10 +658,6 @@ func (pc *PageCreate) defaults() error {
 	if _, ok := pc.mutation.Querystring(); !ok {
 		v := page.DefaultQuerystring
 		pc.mutation.SetQuerystring(v)
-	}
-	if _, ok := pc.mutation.URL(); !ok {
-		v := page.DefaultURL
-		pc.mutation.SetURL(v)
 	}
 	if _, ok := pc.mutation.CountReferred(); !ok {
 		v := page.DefaultCountReferred
@@ -705,16 +668,10 @@ func (pc *PageCreate) defaults() error {
 		pc.mutation.SetStatus(v)
 	}
 	if _, ok := pc.mutation.CreatedAt(); !ok {
-		if page.DefaultCreatedAt == nil {
-			return fmt.Errorf("ent: uninitialized page.DefaultCreatedAt (forgotten import ent/runtime?)")
-		}
 		v := page.DefaultCreatedAt()
 		pc.mutation.SetCreatedAt(v)
 	}
 	if _, ok := pc.mutation.UpdatedAt(); !ok {
-		if page.DefaultUpdatedAt == nil {
-			return fmt.Errorf("ent: uninitialized page.DefaultUpdatedAt (forgotten import ent/runtime?)")
-		}
 		v := page.DefaultUpdatedAt()
 		pc.mutation.SetUpdatedAt(v)
 	}
@@ -826,14 +783,10 @@ func (pc *PageCreate) defaults() error {
 		v := page.DefaultOgVideoHeight
 		pc.mutation.SetOgVideoHeight(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
 func (pc *PageCreate) check() error {
-	if _, ok := pc.mutation.ReferredID(); !ok {
-		return &ValidationError{Name: "referred_id", err: errors.New(`ent: missing required field "Page.referred_id"`)}
-	}
 	if _, ok := pc.mutation.CrawlingVersion(); !ok {
 		return &ValidationError{Name: "crawling_version", err: errors.New(`ent: missing required field "Page.crawling_version"`)}
 	}
@@ -856,12 +809,12 @@ func (pc *PageCreate) check() error {
 	if _, ok := pc.mutation.IsHTTPS(); !ok {
 		return &ValidationError{Name: "is_https", err: errors.New(`ent: missing required field "Page.is_https"`)}
 	}
-	if _, ok := pc.mutation.IndexedURL(); !ok {
-		return &ValidationError{Name: "indexed_url", err: errors.New(`ent: missing required field "Page.indexed_url"`)}
+	if _, ok := pc.mutation.URL(); !ok {
+		return &ValidationError{Name: "url", err: errors.New(`ent: missing required field "Page.url"`)}
 	}
-	if v, ok := pc.mutation.IndexedURL(); ok {
-		if err := page.IndexedURLValidator(v); err != nil {
-			return &ValidationError{Name: "indexed_url", err: fmt.Errorf(`ent: validator failed for field "Page.indexed_url": %w`, err)}
+	if v, ok := pc.mutation.URL(); ok {
+		if err := page.URLValidator(v); err != nil {
+			return &ValidationError{Name: "url", err: fmt.Errorf(`ent: validator failed for field "Page.url": %w`, err)}
 		}
 	}
 	if _, ok := pc.mutation.Path(); !ok {
@@ -874,9 +827,6 @@ func (pc *PageCreate) check() error {
 	}
 	if _, ok := pc.mutation.Querystring(); !ok {
 		return &ValidationError{Name: "querystring", err: errors.New(`ent: missing required field "Page.querystring"`)}
-	}
-	if _, ok := pc.mutation.URL(); !ok {
-		return &ValidationError{Name: "url", err: errors.New(`ent: missing required field "Page.url"`)}
 	}
 	if _, ok := pc.mutation.CountReferred(); !ok {
 		return &ValidationError{Name: "count_referred", err: errors.New(`ent: missing required field "Page.count_referred"`)}
@@ -1004,10 +954,10 @@ func (pc *PageCreate) sqlSave(ctx context.Context) (*Page, error) {
 		return nil, err
 	}
 	if _spec.ID.Value != nil {
-		if id, ok := _spec.ID.Value.(string); ok {
-			_node.ID = id
-		} else {
-			return nil, fmt.Errorf("unexpected Page.ID type: %T", _spec.ID.Value)
+		if id, ok := _spec.ID.Value.(*uuid.UUID); ok {
+			_node.ID = *id
+		} else if err := _node.ID.Scan(_spec.ID.Value); err != nil {
+			return nil, err
 		}
 	}
 	return _node, nil
@@ -1019,7 +969,7 @@ func (pc *PageCreate) createSpec() (*Page, *sqlgraph.CreateSpec) {
 		_spec = &sqlgraph.CreateSpec{
 			Table: page.Table,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: page.FieldID,
 			},
 		}
@@ -1027,11 +977,7 @@ func (pc *PageCreate) createSpec() (*Page, *sqlgraph.CreateSpec) {
 	_spec.OnConflict = pc.conflict
 	if id, ok := pc.mutation.ID(); ok {
 		_node.ID = id
-		_spec.ID.Value = id
-	}
-	if value, ok := pc.mutation.ReferredID(); ok {
-		_spec.SetField(page.FieldReferredID, field.TypeString, value)
-		_node.ReferredID = value
+		_spec.ID.Value = &id
 	}
 	if value, ok := pc.mutation.CrawlingVersion(); ok {
 		_spec.SetField(page.FieldCrawlingVersion, field.TypeString, value)
@@ -1049,9 +995,9 @@ func (pc *PageCreate) createSpec() (*Page, *sqlgraph.CreateSpec) {
 		_spec.SetField(page.FieldIsHTTPS, field.TypeBool, value)
 		_node.IsHTTPS = value
 	}
-	if value, ok := pc.mutation.IndexedURL(); ok {
-		_spec.SetField(page.FieldIndexedURL, field.TypeString, value)
-		_node.IndexedURL = value
+	if value, ok := pc.mutation.URL(); ok {
+		_spec.SetField(page.FieldURL, field.TypeString, value)
+		_node.URL = value
 	}
 	if value, ok := pc.mutation.Path(); ok {
 		_spec.SetField(page.FieldPath, field.TypeString, value)
@@ -1060,10 +1006,6 @@ func (pc *PageCreate) createSpec() (*Page, *sqlgraph.CreateSpec) {
 	if value, ok := pc.mutation.Querystring(); ok {
 		_spec.SetField(page.FieldQuerystring, field.TypeString, value)
 		_node.Querystring = value
-	}
-	if value, ok := pc.mutation.URL(); ok {
-		_spec.SetField(page.FieldURL, field.TypeString, value)
-		_node.URL = value
 	}
 	if value, ok := pc.mutation.CountReferred(); ok {
 		_spec.SetField(page.FieldCountReferred, field.TypeInt64, value)
@@ -1206,7 +1148,7 @@ func (pc *PageCreate) createSpec() (*Page, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
+					Type:   field.TypeUUID,
 					Column: pagesource.FieldID,
 				},
 			},
@@ -1223,7 +1165,7 @@ func (pc *PageCreate) createSpec() (*Page, *sqlgraph.CreateSpec) {
 // of the `INSERT` statement. For example:
 //
 //	client.Page.Create().
-//		SetReferredID(v).
+//		SetCrawlingVersion(v).
 //		OnConflict(
 //			// Update the row with the new values
 //			// the was proposed for insertion.
@@ -1232,7 +1174,7 @@ func (pc *PageCreate) createSpec() (*Page, *sqlgraph.CreateSpec) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.PageUpsert) {
-//			SetReferredID(v+v).
+//			SetCrawlingVersion(v+v).
 //		}).
 //		Exec(ctx)
 func (pc *PageCreate) OnConflict(opts ...sql.ConflictOption) *PageUpsertOne {
@@ -1267,18 +1209,6 @@ type (
 		*sql.UpdateSet
 	}
 )
-
-// SetReferredID sets the "referred_id" field.
-func (u *PageUpsert) SetReferredID(v string) *PageUpsert {
-	u.Set(page.FieldReferredID, v)
-	return u
-}
-
-// UpdateReferredID sets the "referred_id" field to the value that was provided on create.
-func (u *PageUpsert) UpdateReferredID() *PageUpsert {
-	u.SetExcluded(page.FieldReferredID)
-	return u
-}
 
 // SetCrawlingVersion sets the "crawling_version" field.
 func (u *PageUpsert) SetCrawlingVersion(v string) *PageUpsert {
@@ -1328,15 +1258,15 @@ func (u *PageUpsert) UpdateIsHTTPS() *PageUpsert {
 	return u
 }
 
-// SetIndexedURL sets the "indexed_url" field.
-func (u *PageUpsert) SetIndexedURL(v string) *PageUpsert {
-	u.Set(page.FieldIndexedURL, v)
+// SetURL sets the "url" field.
+func (u *PageUpsert) SetURL(v string) *PageUpsert {
+	u.Set(page.FieldURL, v)
 	return u
 }
 
-// UpdateIndexedURL sets the "indexed_url" field to the value that was provided on create.
-func (u *PageUpsert) UpdateIndexedURL() *PageUpsert {
-	u.SetExcluded(page.FieldIndexedURL)
+// UpdateURL sets the "url" field to the value that was provided on create.
+func (u *PageUpsert) UpdateURL() *PageUpsert {
+	u.SetExcluded(page.FieldURL)
 	return u
 }
 
@@ -1361,18 +1291,6 @@ func (u *PageUpsert) SetQuerystring(v string) *PageUpsert {
 // UpdateQuerystring sets the "querystring" field to the value that was provided on create.
 func (u *PageUpsert) UpdateQuerystring() *PageUpsert {
 	u.SetExcluded(page.FieldQuerystring)
-	return u
-}
-
-// SetURL sets the "url" field.
-func (u *PageUpsert) SetURL(v string) *PageUpsert {
-	u.Set(page.FieldURL, v)
-	return u
-}
-
-// UpdateURL sets the "url" field to the value that was provided on create.
-func (u *PageUpsert) UpdateURL() *PageUpsert {
-	u.SetExcluded(page.FieldURL)
 	return u
 }
 
@@ -1817,20 +1735,6 @@ func (u *PageUpsertOne) Update(set func(*PageUpsert)) *PageUpsertOne {
 	return u
 }
 
-// SetReferredID sets the "referred_id" field.
-func (u *PageUpsertOne) SetReferredID(v string) *PageUpsertOne {
-	return u.Update(func(s *PageUpsert) {
-		s.SetReferredID(v)
-	})
-}
-
-// UpdateReferredID sets the "referred_id" field to the value that was provided on create.
-func (u *PageUpsertOne) UpdateReferredID() *PageUpsertOne {
-	return u.Update(func(s *PageUpsert) {
-		s.UpdateReferredID()
-	})
-}
-
 // SetCrawlingVersion sets the "crawling_version" field.
 func (u *PageUpsertOne) SetCrawlingVersion(v string) *PageUpsertOne {
 	return u.Update(func(s *PageUpsert) {
@@ -1887,17 +1791,17 @@ func (u *PageUpsertOne) UpdateIsHTTPS() *PageUpsertOne {
 	})
 }
 
-// SetIndexedURL sets the "indexed_url" field.
-func (u *PageUpsertOne) SetIndexedURL(v string) *PageUpsertOne {
+// SetURL sets the "url" field.
+func (u *PageUpsertOne) SetURL(v string) *PageUpsertOne {
 	return u.Update(func(s *PageUpsert) {
-		s.SetIndexedURL(v)
+		s.SetURL(v)
 	})
 }
 
-// UpdateIndexedURL sets the "indexed_url" field to the value that was provided on create.
-func (u *PageUpsertOne) UpdateIndexedURL() *PageUpsertOne {
+// UpdateURL sets the "url" field to the value that was provided on create.
+func (u *PageUpsertOne) UpdateURL() *PageUpsertOne {
 	return u.Update(func(s *PageUpsert) {
-		s.UpdateIndexedURL()
+		s.UpdateURL()
 	})
 }
 
@@ -1926,20 +1830,6 @@ func (u *PageUpsertOne) SetQuerystring(v string) *PageUpsertOne {
 func (u *PageUpsertOne) UpdateQuerystring() *PageUpsertOne {
 	return u.Update(func(s *PageUpsert) {
 		s.UpdateQuerystring()
-	})
-}
-
-// SetURL sets the "url" field.
-func (u *PageUpsertOne) SetURL(v string) *PageUpsertOne {
-	return u.Update(func(s *PageUpsert) {
-		s.SetURL(v)
-	})
-}
-
-// UpdateURL sets the "url" field to the value that was provided on create.
-func (u *PageUpsertOne) UpdateURL() *PageUpsertOne {
-	return u.Update(func(s *PageUpsert) {
-		s.UpdateURL()
 	})
 }
 
@@ -2414,7 +2304,7 @@ func (u *PageUpsertOne) ExecX(ctx context.Context) {
 }
 
 // Exec executes the UPSERT query and returns the inserted/updated ID.
-func (u *PageUpsertOne) ID(ctx context.Context) (id string, err error) {
+func (u *PageUpsertOne) ID(ctx context.Context) (id uuid.UUID, err error) {
 	if u.create.driver.Dialect() == dialect.MySQL {
 		// In case of "ON CONFLICT", there is no way to get back non-numeric ID
 		// fields from the database since MySQL does not support the RETURNING clause.
@@ -2428,7 +2318,7 @@ func (u *PageUpsertOne) ID(ctx context.Context) (id string, err error) {
 }
 
 // IDX is like ID, but panics if an error occurs.
-func (u *PageUpsertOne) IDX(ctx context.Context) string {
+func (u *PageUpsertOne) IDX(ctx context.Context) uuid.UUID {
 	id, err := u.ID(ctx)
 	if err != nil {
 		panic(err)
@@ -2530,7 +2420,7 @@ func (pcb *PageCreateBulk) ExecX(ctx context.Context) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.PageUpsert) {
-//			SetReferredID(v+v).
+//			SetCrawlingVersion(v+v).
 //		}).
 //		Exec(ctx)
 func (pcb *PageCreateBulk) OnConflict(opts ...sql.ConflictOption) *PageUpsertBulk {
@@ -2612,20 +2502,6 @@ func (u *PageUpsertBulk) Update(set func(*PageUpsert)) *PageUpsertBulk {
 	return u
 }
 
-// SetReferredID sets the "referred_id" field.
-func (u *PageUpsertBulk) SetReferredID(v string) *PageUpsertBulk {
-	return u.Update(func(s *PageUpsert) {
-		s.SetReferredID(v)
-	})
-}
-
-// UpdateReferredID sets the "referred_id" field to the value that was provided on create.
-func (u *PageUpsertBulk) UpdateReferredID() *PageUpsertBulk {
-	return u.Update(func(s *PageUpsert) {
-		s.UpdateReferredID()
-	})
-}
-
 // SetCrawlingVersion sets the "crawling_version" field.
 func (u *PageUpsertBulk) SetCrawlingVersion(v string) *PageUpsertBulk {
 	return u.Update(func(s *PageUpsert) {
@@ -2682,17 +2558,17 @@ func (u *PageUpsertBulk) UpdateIsHTTPS() *PageUpsertBulk {
 	})
 }
 
-// SetIndexedURL sets the "indexed_url" field.
-func (u *PageUpsertBulk) SetIndexedURL(v string) *PageUpsertBulk {
+// SetURL sets the "url" field.
+func (u *PageUpsertBulk) SetURL(v string) *PageUpsertBulk {
 	return u.Update(func(s *PageUpsert) {
-		s.SetIndexedURL(v)
+		s.SetURL(v)
 	})
 }
 
-// UpdateIndexedURL sets the "indexed_url" field to the value that was provided on create.
-func (u *PageUpsertBulk) UpdateIndexedURL() *PageUpsertBulk {
+// UpdateURL sets the "url" field to the value that was provided on create.
+func (u *PageUpsertBulk) UpdateURL() *PageUpsertBulk {
 	return u.Update(func(s *PageUpsert) {
-		s.UpdateIndexedURL()
+		s.UpdateURL()
 	})
 }
 
@@ -2721,20 +2597,6 @@ func (u *PageUpsertBulk) SetQuerystring(v string) *PageUpsertBulk {
 func (u *PageUpsertBulk) UpdateQuerystring() *PageUpsertBulk {
 	return u.Update(func(s *PageUpsert) {
 		s.UpdateQuerystring()
-	})
-}
-
-// SetURL sets the "url" field.
-func (u *PageUpsertBulk) SetURL(v string) *PageUpsertBulk {
-	return u.Update(func(s *PageUpsert) {
-		s.SetURL(v)
-	})
-}
-
-// UpdateURL sets the "url" field to the value that was provided on create.
-func (u *PageUpsertBulk) UpdateURL() *PageUpsertBulk {
-	return u.Update(func(s *PageUpsert) {
-		s.UpdateURL()
 	})
 }
 

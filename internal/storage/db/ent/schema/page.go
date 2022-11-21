@@ -1,15 +1,12 @@
 package schema
 
 import (
-	"context"
 	"time"
 
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 
-	myent "github.com/drakejin/crawler/internal/storage/db/ent"
-	"github.com/drakejin/crawler/internal/storage/db/ent/hook"
 	"github.com/drakejin/crawler/internal/storage/db/ent/validate"
 
 	"entgo.io/ent"
@@ -27,9 +24,7 @@ type Page struct {
 // Fields of the Page.
 func (Page) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("id").Unique(),
-		field.String("referred_id"),
-
+		field.UUID("id", uuid.UUID{}).Unique(),
 		field.String("crawling_version"),
 
 		field.String("domain").
@@ -37,8 +32,7 @@ func (Page) Fields() []ent.Field {
 				Size: 700,
 			}).
 			Validate(validate.MaxRuneCount(200)).
-			Comment("domain www.example.com").
-			Unique(),
+			Comment("domain www.example.com"),
 
 		field.String("port").
 			Annotations(entsql.Annotation{
@@ -52,12 +46,12 @@ func (Page) Fields() []ent.Field {
 			Default(false).
 			Comment("is used tls/ssl layer flag"),
 
-		field.String("indexed_url").
+		field.String("url").
 			Annotations(entsql.Annotation{
-				Size: 1000,
+				Size: 750,
 			}).
-			Default("").
-			Validate(validate.MaxRuneCount(300)).
+			NotEmpty().
+			Validate(validate.MaxRuneCount(1200)).
 			Comment("url for only indexing"),
 
 		field.String("path").
@@ -75,12 +69,12 @@ func (Page) Fields() []ent.Field {
 			}).
 			Comment("url.querystring"),
 
-		field.Text("url").
-			Default("").
-			SchemaType(map[string]string{
-				dialect.MySQL: "text",
-			}).
-			Comment("this mean url"),
+		//field.Text("url").
+		//	Default("").
+		//	SchemaType(map[string]string{
+		//		dialect.MySQL: "text",
+		//	}).
+		//	Comment("this mean url"),
 
 		field.Int64("count_referred").
 			Default(0).
@@ -238,23 +232,6 @@ func (Page) Fields() []ent.Field {
 	}
 }
 
-// Hooks of the Page.
-func (Page) Hooks() []ent.Hook {
-	return []ent.Hook{
-		// First hook.
-		hook.On(
-			func(next ent.Mutator) ent.Mutator {
-				return hook.PageFunc(func(ctx context.Context, m *myent.PageMutation) (ent.Value, error) {
-					m.SetID(uuid.NewString())
-					return next.Mutate(ctx, m)
-				})
-			},
-			// Limit the hook only for these operations.
-			ent.OpCreate,
-		),
-	}
-}
-
 // Edges of the Page.
 func (Page) Edges() []ent.Edge {
 	return []ent.Edge{
@@ -265,8 +242,8 @@ func (Page) Edges() []ent.Edge {
 // Indexes of the Page
 func (Page) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("crawling_version"),
-		index.Fields("referred_id"),
+		index.Fields("url").StorageKey("ux_url").Unique(),
+		index.Fields("crawling_version").StorageKey("ux_url_and_crawling_version").Unique(),
 	}
 }
 

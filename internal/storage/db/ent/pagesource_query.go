@@ -10,9 +10,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 	"github.com/drakejin/crawler/internal/storage/db/ent/predicate"
+	"github.com/google/uuid"
 )
 
 // PageSourceQuery is the builder for querying PageSource entities.
@@ -24,7 +24,7 @@ type PageSourceQuery struct {
 	order      []OrderFunc
 	fields     []string
 	predicates []predicate.PageSource
-	withPage   *PageQuery
+	withFKs    bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -61,28 +61,6 @@ func (psq *PageSourceQuery) Order(o ...OrderFunc) *PageSourceQuery {
 	return psq
 }
 
-// QueryPage chains the current query on the "page" edge.
-func (psq *PageSourceQuery) QueryPage() *PageQuery {
-	query := &PageQuery{config: psq.config}
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := psq.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := psq.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(pagesource.Table, pagesource.FieldID, selector),
-			sqlgraph.To(page.Table, page.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, pagesource.PageTable, pagesource.PageColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(psq.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
 // First returns the first PageSource entity from the query.
 // Returns a *NotFoundError when no PageSource was found.
 func (psq *PageSourceQuery) First(ctx context.Context) (*PageSource, error) {
@@ -107,8 +85,8 @@ func (psq *PageSourceQuery) FirstX(ctx context.Context) *PageSource {
 
 // FirstID returns the first PageSource ID from the query.
 // Returns a *NotFoundError when no PageSource ID was found.
-func (psq *PageSourceQuery) FirstID(ctx context.Context) (id string, err error) {
-	var ids []string
+func (psq *PageSourceQuery) FirstID(ctx context.Context) (id uuid.UUID, err error) {
+	var ids []uuid.UUID
 	if ids, err = psq.Limit(1).IDs(ctx); err != nil {
 		return
 	}
@@ -120,7 +98,7 @@ func (psq *PageSourceQuery) FirstID(ctx context.Context) (id string, err error) 
 }
 
 // FirstIDX is like FirstID, but panics if an error occurs.
-func (psq *PageSourceQuery) FirstIDX(ctx context.Context) string {
+func (psq *PageSourceQuery) FirstIDX(ctx context.Context) uuid.UUID {
 	id, err := psq.FirstID(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -158,8 +136,8 @@ func (psq *PageSourceQuery) OnlyX(ctx context.Context) *PageSource {
 // OnlyID is like Only, but returns the only PageSource ID in the query.
 // Returns a *NotSingularError when more than one PageSource ID is found.
 // Returns a *NotFoundError when no entities are found.
-func (psq *PageSourceQuery) OnlyID(ctx context.Context) (id string, err error) {
-	var ids []string
+func (psq *PageSourceQuery) OnlyID(ctx context.Context) (id uuid.UUID, err error) {
+	var ids []uuid.UUID
 	if ids, err = psq.Limit(2).IDs(ctx); err != nil {
 		return
 	}
@@ -175,7 +153,7 @@ func (psq *PageSourceQuery) OnlyID(ctx context.Context) (id string, err error) {
 }
 
 // OnlyIDX is like OnlyID, but panics if an error occurs.
-func (psq *PageSourceQuery) OnlyIDX(ctx context.Context) string {
+func (psq *PageSourceQuery) OnlyIDX(ctx context.Context) uuid.UUID {
 	id, err := psq.OnlyID(ctx)
 	if err != nil {
 		panic(err)
@@ -201,8 +179,8 @@ func (psq *PageSourceQuery) AllX(ctx context.Context) []*PageSource {
 }
 
 // IDs executes the query and returns a list of PageSource IDs.
-func (psq *PageSourceQuery) IDs(ctx context.Context) ([]string, error) {
-	var ids []string
+func (psq *PageSourceQuery) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
 	if err := psq.Select(pagesource.FieldID).Scan(ctx, &ids); err != nil {
 		return nil, err
 	}
@@ -210,7 +188,7 @@ func (psq *PageSourceQuery) IDs(ctx context.Context) ([]string, error) {
 }
 
 // IDsX is like IDs, but panics if an error occurs.
-func (psq *PageSourceQuery) IDsX(ctx context.Context) []string {
+func (psq *PageSourceQuery) IDsX(ctx context.Context) []uuid.UUID {
 	ids, err := psq.IDs(ctx)
 	if err != nil {
 		panic(err)
@@ -264,23 +242,11 @@ func (psq *PageSourceQuery) Clone() *PageSourceQuery {
 		offset:     psq.offset,
 		order:      append([]OrderFunc{}, psq.order...),
 		predicates: append([]predicate.PageSource{}, psq.predicates...),
-		withPage:   psq.withPage.Clone(),
 		// clone intermediate query.
 		sql:    psq.sql.Clone(),
 		path:   psq.path,
 		unique: psq.unique,
 	}
-}
-
-// WithPage tells the query-builder to eager-load the nodes that are connected to
-// the "page" edge. The optional arguments are used to configure the query builder of the edge.
-func (psq *PageSourceQuery) WithPage(opts ...func(*PageQuery)) *PageSourceQuery {
-	query := &PageQuery{config: psq.config}
-	for _, opt := range opts {
-		opt(query)
-	}
-	psq.withPage = query
-	return psq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -289,12 +255,12 @@ func (psq *PageSourceQuery) WithPage(opts ...func(*PageQuery)) *PageSourceQuery 
 // Example:
 //
 //	var v []struct {
-//		PageID string `json:"page_id,omitempty"`
+//		Source string `json:"source,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.PageSource.Query().
-//		GroupBy(pagesource.FieldPageID).
+//		GroupBy(pagesource.FieldSource).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (psq *PageSourceQuery) GroupBy(field string, fields ...string) *PageSourceGroupBy {
@@ -317,11 +283,11 @@ func (psq *PageSourceQuery) GroupBy(field string, fields ...string) *PageSourceG
 // Example:
 //
 //	var v []struct {
-//		PageID string `json:"page_id,omitempty"`
+//		Source string `json:"source,omitempty"`
 //	}
 //
 //	client.PageSource.Query().
-//		Select(pagesource.FieldPageID).
+//		Select(pagesource.FieldSource).
 //		Scan(ctx, &v)
 func (psq *PageSourceQuery) Select(fields ...string) *PageSourceSelect {
 	psq.fields = append(psq.fields, fields...)
@@ -354,19 +320,19 @@ func (psq *PageSourceQuery) prepareQuery(ctx context.Context) error {
 
 func (psq *PageSourceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*PageSource, error) {
 	var (
-		nodes       = []*PageSource{}
-		_spec       = psq.querySpec()
-		loadedTypes = [1]bool{
-			psq.withPage != nil,
-		}
+		nodes   = []*PageSource{}
+		withFKs = psq.withFKs
+		_spec   = psq.querySpec()
 	)
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, pagesource.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*PageSource).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &PageSource{config: psq.config}
 		nodes = append(nodes, node)
-		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -378,40 +344,7 @@ func (psq *PageSourceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := psq.withPage; query != nil {
-		if err := psq.loadPage(ctx, query, nodes, nil,
-			func(n *PageSource, e *Page) { n.Edges.Page = e }); err != nil {
-			return nil, err
-		}
-	}
 	return nodes, nil
-}
-
-func (psq *PageSourceQuery) loadPage(ctx context.Context, query *PageQuery, nodes []*PageSource, init func(*PageSource), assign func(*PageSource, *Page)) error {
-	ids := make([]string, 0, len(nodes))
-	nodeids := make(map[string][]*PageSource)
-	for i := range nodes {
-		fk := nodes[i].PageID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	query.Where(page.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "page_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
 }
 
 func (psq *PageSourceQuery) sqlCount(ctx context.Context) (int, error) {
@@ -440,7 +373,7 @@ func (psq *PageSourceQuery) querySpec() *sqlgraph.QuerySpec {
 			Table:   pagesource.Table,
 			Columns: pagesource.Columns,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: pagesource.FieldID,
 			},
 		},

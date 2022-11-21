@@ -5,8 +5,6 @@ package page
 import (
 	"fmt"
 	"time"
-
-	"entgo.io/ent"
 )
 
 const (
@@ -14,8 +12,6 @@ const (
 	Label = "page"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
-	// FieldReferredID holds the string denoting the referred_id field in the database.
-	FieldReferredID = "referred_id"
 	// FieldCrawlingVersion holds the string denoting the crawling_version field in the database.
 	FieldCrawlingVersion = "crawling_version"
 	// FieldDomain holds the string denoting the domain field in the database.
@@ -24,14 +20,12 @@ const (
 	FieldPort = "port"
 	// FieldIsHTTPS holds the string denoting the is_https field in the database.
 	FieldIsHTTPS = "is_https"
-	// FieldIndexedURL holds the string denoting the indexed_url field in the database.
-	FieldIndexedURL = "indexed_url"
+	// FieldURL holds the string denoting the url field in the database.
+	FieldURL = "url"
 	// FieldPath holds the string denoting the path field in the database.
 	FieldPath = "path"
 	// FieldQuerystring holds the string denoting the querystring field in the database.
 	FieldQuerystring = "querystring"
-	// FieldURL holds the string denoting the url field in the database.
-	FieldURL = "url"
 	// FieldCountReferred holds the string denoting the count_referred field in the database.
 	FieldCountReferred = "count_referred"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -108,21 +102,19 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "pagesource" package.
 	PageSourceInverseTable = "page_source"
 	// PageSourceColumn is the table column denoting the page_source relation/edge.
-	PageSourceColumn = "page_id"
+	PageSourceColumn = "page_page_source"
 )
 
 // Columns holds all SQL columns for page fields.
 var Columns = []string{
 	FieldID,
-	FieldReferredID,
 	FieldCrawlingVersion,
 	FieldDomain,
 	FieldPort,
 	FieldIsHTTPS,
-	FieldIndexedURL,
+	FieldURL,
 	FieldPath,
 	FieldQuerystring,
-	FieldURL,
 	FieldCountReferred,
 	FieldStatus,
 	FieldCreatedAt,
@@ -168,13 +160,7 @@ func ValidColumn(column string) bool {
 	return false
 }
 
-// Note that the variables below are initialized by the runtime
-// package on the initialization of the application. Therefore,
-// it should be imported in the main as follows:
-//
-//	import _ "github.com/drakejin/crawler/internal/storage/db/ent/runtime"
 var (
-	Hooks [1]ent.Hook
 	// DomainValidator is a validator for the "domain" field. It is called by the builders before save.
 	DomainValidator func(string) error
 	// DefaultPort holds the default value on creation for the "port" field.
@@ -183,18 +169,14 @@ var (
 	PortValidator func(string) error
 	// DefaultIsHTTPS holds the default value on creation for the "is_https" field.
 	DefaultIsHTTPS bool
-	// DefaultIndexedURL holds the default value on creation for the "indexed_url" field.
-	DefaultIndexedURL string
-	// IndexedURLValidator is a validator for the "indexed_url" field. It is called by the builders before save.
-	IndexedURLValidator func(string) error
+	// URLValidator is a validator for the "url" field. It is called by the builders before save.
+	URLValidator func(string) error
 	// DefaultPath holds the default value on creation for the "path" field.
 	DefaultPath string
 	// PathValidator is a validator for the "path" field. It is called by the builders before save.
 	PathValidator func(string) error
 	// DefaultQuerystring holds the default value on creation for the "querystring" field.
 	DefaultQuerystring string
-	// DefaultURL holds the default value on creation for the "url" field.
-	DefaultURL string
 	// DefaultCountReferred holds the default value on creation for the "count_referred" field.
 	DefaultCountReferred int64
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.

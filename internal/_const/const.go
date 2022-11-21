@@ -2,6 +2,7 @@ package _const
 
 const (
 	SplitDelimiter = ","
+	SchemaHTTPS    = "https"
 
 	// https://developers.google.com/search/docs/crawling-indexing/special-tags
 	TagTitle = "title"

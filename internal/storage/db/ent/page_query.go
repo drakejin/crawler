@@ -14,6 +14,7 @@ import (
 	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 	"github.com/drakejin/crawler/internal/storage/db/ent/predicate"
+	"github.com/google/uuid"
 )
 
 // PageQuery is the builder for querying Page entities.
@@ -108,8 +109,8 @@ func (pq *PageQuery) FirstX(ctx context.Context) *Page {
 
 // FirstID returns the first Page ID from the query.
 // Returns a *NotFoundError when no Page ID was found.
-func (pq *PageQuery) FirstID(ctx context.Context) (id string, err error) {
-	var ids []string
+func (pq *PageQuery) FirstID(ctx context.Context) (id uuid.UUID, err error) {
+	var ids []uuid.UUID
 	if ids, err = pq.Limit(1).IDs(ctx); err != nil {
 		return
 	}
@@ -121,7 +122,7 @@ func (pq *PageQuery) FirstID(ctx context.Context) (id string, err error) {
 }
 
 // FirstIDX is like FirstID, but panics if an error occurs.
-func (pq *PageQuery) FirstIDX(ctx context.Context) string {
+func (pq *PageQuery) FirstIDX(ctx context.Context) uuid.UUID {
 	id, err := pq.FirstID(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -159,8 +160,8 @@ func (pq *PageQuery) OnlyX(ctx context.Context) *Page {
 // OnlyID is like Only, but returns the only Page ID in the query.
 // Returns a *NotSingularError when more than one Page ID is found.
 // Returns a *NotFoundError when no entities are found.
-func (pq *PageQuery) OnlyID(ctx context.Context) (id string, err error) {
-	var ids []string
+func (pq *PageQuery) OnlyID(ctx context.Context) (id uuid.UUID, err error) {
+	var ids []uuid.UUID
 	if ids, err = pq.Limit(2).IDs(ctx); err != nil {
 		return
 	}
@@ -176,7 +177,7 @@ func (pq *PageQuery) OnlyID(ctx context.Context) (id string, err error) {
 }
 
 // OnlyIDX is like OnlyID, but panics if an error occurs.
-func (pq *PageQuery) OnlyIDX(ctx context.Context) string {
+func (pq *PageQuery) OnlyIDX(ctx context.Context) uuid.UUID {
 	id, err := pq.OnlyID(ctx)
 	if err != nil {
 		panic(err)
@@ -202,8 +203,8 @@ func (pq *PageQuery) AllX(ctx context.Context) []*Page {
 }
 
 // IDs executes the query and returns a list of Page IDs.
-func (pq *PageQuery) IDs(ctx context.Context) ([]string, error) {
-	var ids []string
+func (pq *PageQuery) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
 	if err := pq.Select(page.FieldID).Scan(ctx, &ids); err != nil {
 		return nil, err
 	}
@@ -211,7 +212,7 @@ func (pq *PageQuery) IDs(ctx context.Context) ([]string, error) {
 }
 
 // IDsX is like IDs, but panics if an error occurs.
-func (pq *PageQuery) IDsX(ctx context.Context) []string {
+func (pq *PageQuery) IDsX(ctx context.Context) []uuid.UUID {
 	ids, err := pq.IDs(ctx)
 	if err != nil {
 		panic(err)
@@ -290,12 +291,12 @@ func (pq *PageQuery) WithPageSource(opts ...func(*PageSourceQuery)) *PageQuery {
 // Example:
 //
 //	var v []struct {
-//		ReferredID string `json:"referred_id,omitempty"`
+//		CrawlingVersion string `json:"crawling_version,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.Page.Query().
-//		GroupBy(page.FieldReferredID).
+//		GroupBy(page.FieldCrawlingVersion).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (pq *PageQuery) GroupBy(field string, fields ...string) *PageGroupBy {
@@ -318,11 +319,11 @@ func (pq *PageQuery) GroupBy(field string, fields ...string) *PageGroupBy {
 // Example:
 //
 //	var v []struct {
-//		ReferredID string `json:"referred_id,omitempty"`
+//		CrawlingVersion string `json:"crawling_version,omitempty"`
 //	}
 //
 //	client.Page.Query().
-//		Select(page.FieldReferredID).
+//		Select(page.FieldCrawlingVersion).
 //		Scan(ctx, &v)
 func (pq *PageQuery) Select(fields ...string) *PageSelect {
 	pq.fields = append(pq.fields, fields...)
@@ -391,7 +392,7 @@ func (pq *PageQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Page, e
 
 func (pq *PageQuery) loadPageSource(ctx context.Context, query *PageSourceQuery, nodes []*Page, init func(*Page), assign func(*Page, *PageSource)) error {
 	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[string]*Page)
+	nodeids := make(map[uuid.UUID]*Page)
 	for i := range nodes {
 		fks = append(fks, nodes[i].ID)
 		nodeids[nodes[i].ID] = nodes[i]
@@ -399,6 +400,7 @@ func (pq *PageQuery) loadPageSource(ctx context.Context, query *PageSourceQuery,
 			init(nodes[i])
 		}
 	}
+	query.withFKs = true
 	query.Where(predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.InValues(page.PageSourceColumn, fks...))
 	}))
@@ -407,10 +409,13 @@ func (pq *PageQuery) loadPageSource(ctx context.Context, query *PageSourceQuery,
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.PageID
-		node, ok := nodeids[fk]
+		fk := n.page_page_source
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "page_page_source" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "page_id" returned %v for node %v`, fk, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "page_page_source" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}
@@ -443,7 +448,7 @@ func (pq *PageQuery) querySpec() *sqlgraph.QuerySpec {
 			Table:   page.Table,
 			Columns: page.Columns,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: page.FieldID,
 			},
 		},

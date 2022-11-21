@@ -7,50 +7,18 @@ import (
 	"strings"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
+	"github.com/google/uuid"
 )
 
 // PageSource is the model entity for the PageSource schema.
 type PageSource struct {
 	config `json:"-"`
 	// ID of the ent.
-	ID string `json:"id,omitempty"`
-	// PageID holds the value of the "page_id" field.
-	PageID string `json:"page_id,omitempty"`
-	// ReferredPageID holds the value of the "referred_page_id" field.
-	ReferredPageID string `json:"referred_page_id,omitempty"`
-	// this mean url
-	URL string `json:"url,omitempty"`
-	// this mean previous referred_url
-	ReferredURL string `json:"referred_url,omitempty"`
+	ID uuid.UUID `json:"id,omitempty"`
 	// html view source code
-	Source string `json:"source,omitempty"`
-	// Edges holds the relations/edges for other nodes in the graph.
-	// The values are being populated by the PageSourceQuery when eager-loading is set.
-	Edges PageSourceEdges `json:"edges"`
-}
-
-// PageSourceEdges holds the relations/edges for other nodes in the graph.
-type PageSourceEdges struct {
-	// Page holds the value of the page edge.
-	Page *Page `json:"page,omitempty"`
-	// loadedTypes holds the information for reporting if a
-	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
-}
-
-// PageOrErr returns the Page value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e PageSourceEdges) PageOrErr() (*Page, error) {
-	if e.loadedTypes[0] {
-		if e.Page == nil {
-			// Edge was loaded but was not found.
-			return nil, &NotFoundError{label: page.Label}
-		}
-		return e.Page, nil
-	}
-	return nil, &NotLoadedError{edge: "page"}
+	Source           string `json:"source,omitempty"`
+	page_page_source *uuid.UUID
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -58,8 +26,12 @@ func (*PageSource) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case pagesource.FieldID, pagesource.FieldPageID, pagesource.FieldReferredPageID, pagesource.FieldURL, pagesource.FieldReferredURL, pagesource.FieldSource:
+		case pagesource.FieldSource:
 			values[i] = new(sql.NullString)
+		case pagesource.FieldID:
+			values[i] = new(uuid.UUID)
+		case pagesource.ForeignKeys[0]: // page_page_source
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			return nil, fmt.Errorf("unexpected column %q for type PageSource", columns[i])
 		}
@@ -76,34 +48,10 @@ func (ps *PageSource) assignValues(columns []string, values []any) error {
 	for i := range columns {
 		switch columns[i] {
 		case pagesource.FieldID:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*uuid.UUID); !ok {
 				return fmt.Errorf("unexpected type %T for field id", values[i])
-			} else if value.Valid {
-				ps.ID = value.String
-			}
-		case pagesource.FieldPageID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field page_id", values[i])
-			} else if value.Valid {
-				ps.PageID = value.String
-			}
-		case pagesource.FieldReferredPageID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field referred_page_id", values[i])
-			} else if value.Valid {
-				ps.ReferredPageID = value.String
-			}
-		case pagesource.FieldURL:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field url", values[i])
-			} else if value.Valid {
-				ps.URL = value.String
-			}
-		case pagesource.FieldReferredURL:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field referred_url", values[i])
-			} else if value.Valid {
-				ps.ReferredURL = value.String
+			} else if value != nil {
+				ps.ID = *value
 			}
 		case pagesource.FieldSource:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -111,14 +59,16 @@ func (ps *PageSource) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ps.Source = value.String
 			}
+		case pagesource.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field page_page_source", values[i])
+			} else if value.Valid {
+				ps.page_page_source = new(uuid.UUID)
+				*ps.page_page_source = *value.S.(*uuid.UUID)
+			}
 		}
 	}
 	return nil
-}
-
-// QueryPage queries the "page" edge of the PageSource entity.
-func (ps *PageSource) QueryPage() *PageQuery {
-	return (&PageSourceClient{config: ps.config}).QueryPage(ps)
 }
 
 // Update returns a builder for updating this PageSource.
@@ -144,18 +94,6 @@ func (ps *PageSource) String() string {
 	var builder strings.Builder
 	builder.WriteString("PageSource(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", ps.ID))
-	builder.WriteString("page_id=")
-	builder.WriteString(ps.PageID)
-	builder.WriteString(", ")
-	builder.WriteString("referred_page_id=")
-	builder.WriteString(ps.ReferredPageID)
-	builder.WriteString(", ")
-	builder.WriteString("url=")
-	builder.WriteString(ps.URL)
-	builder.WriteString(", ")
-	builder.WriteString("referred_url=")
-	builder.WriteString(ps.ReferredURL)
-	builder.WriteString(", ")
 	builder.WriteString("source=")
 	builder.WriteString(ps.Source)
 	builder.WriteByte(')')

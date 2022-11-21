@@ -3,6 +3,8 @@ package model
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 )
 
@@ -18,9 +20,9 @@ var (
 
 type Page struct {
 	// ID of the ent.
-	ID string `json:"id,omitempty"`
-	// ReferredID holds the value of the "referred_id" field.
-	ReferredID string `json:"referred_id,omitempty"`
+	ID    uuid.UUID `json:"id,omitempty"`
+	Links []string  `json:"links"`
+
 	// CrawlingVersion holds the value of the "crawling_version" field.
 	CrawlingVersion string `json:"crawling_version,omitempty"`
 	// domain www.example.com
@@ -29,8 +31,6 @@ type Page struct {
 	Port string `json:"port,omitempty"`
 	// is used tls/ssl layer flag
 	IsHTTPS bool `json:"is_https,omitempty"`
-	// url for only indexing
-	IndexedURL string `json:"indexed_url,omitempty"`
 	// url.path
 	Path string `json:"path,omitempty"`
 	// url.querystring
@@ -107,15 +107,7 @@ type Page struct {
 
 type PageSource struct {
 	// ID of the ent.
-	ID string `json:"id,omitempty"`
-	// PageID holds the value of the "page_id" field.
-	PageID string `json:"page_id,omitempty"`
-	// ReferredPageID holds the value of the "referred_page_id" field.
-	ReferredPageID string `json:"referred_page_id,omitempty"`
-	// this mean url
-	URL string `json:"url,omitempty"`
-	// this mean previous referred_url
-	ReferredURL string `json:"referred_url,omitempty"`
+	ID uuid.UUID `json:"id,omitempty"`
 	// html view source code
 	Source string `json:"source,omitempty"`
 }

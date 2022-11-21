@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/drakejin/crawler/internal/storage/db/ent/page"
-	"github.com/drakejin/crawler/internal/storage/db/ent/pagelink"
+	"github.com/drakejin/crawler/internal/storage/db/ent/pagereferred"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 	"github.com/drakejin/crawler/internal/storage/db/ent/predicate"
+	"github.com/google/uuid"
 
 	"entgo.io/ent"
 )
@@ -26,9 +27,9 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypePage       = "Page"
-	TypePageLink   = "PageLink"
-	TypePageSource = "PageSource"
+	TypePage         = "Page"
+	TypePageReferred = "PageReferred"
+	TypePageSource   = "PageSource"
 )
 
 // PageMutation represents an operation that mutates the Page nodes in the graph.
@@ -36,16 +37,14 @@ type PageMutation struct {
 	config
 	op                  Op
 	typ                 string
-	id                  *string
-	referred_id         *string
+	id                  *uuid.UUID
 	crawling_version    *string
 	domain              *string
 	port                *string
 	is_https            *bool
-	indexed_url         *string
+	url                 *string
 	_path               *string
 	querystring         *string
-	url                 *string
 	count_referred      *int64
 	addcount_referred   *int64
 	status              *page.Status
@@ -81,8 +80,8 @@ type PageMutation struct {
 	og_video_width      *string
 	og_video_height     *string
 	clearedFields       map[string]struct{}
-	page_source         map[string]struct{}
-	removedpage_source  map[string]struct{}
+	page_source         map[uuid.UUID]struct{}
+	removedpage_source  map[uuid.UUID]struct{}
 	clearedpage_source  bool
 	done                bool
 	oldValue            func(context.Context) (*Page, error)
@@ -109,7 +108,7 @@ func newPageMutation(c config, op Op, opts ...pageOption) *PageMutation {
 }
 
 // withPageID sets the ID field of the mutation.
-func withPageID(id string) pageOption {
+func withPageID(id uuid.UUID) pageOption {
 	return func(m *PageMutation) {
 		var (
 			err   error
@@ -161,13 +160,13 @@ func (m PageMutation) Tx() (*Tx, error) {
 
 // SetID sets the value of the id field. Note that this
 // operation is only accepted on creation of Page entities.
-func (m *PageMutation) SetID(id string) {
+func (m *PageMutation) SetID(id uuid.UUID) {
 	m.id = &id
 }
 
 // ID returns the ID value in the mutation. Note that the ID is only available
 // if it was provided to the builder or after it was returned from the database.
-func (m *PageMutation) ID() (id string, exists bool) {
+func (m *PageMutation) ID() (id uuid.UUID, exists bool) {
 	if m.id == nil {
 		return
 	}
@@ -178,12 +177,12 @@ func (m *PageMutation) ID() (id string, exists bool) {
 // That means, if the mutation is applied within a transaction with an isolation level such
 // as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
 // or updated by the mutation.
-func (m *PageMutation) IDs(ctx context.Context) ([]string, error) {
+func (m *PageMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
 	switch {
 	case m.op.Is(OpUpdateOne | OpDeleteOne):
 		id, exists := m.ID()
 		if exists {
-			return []string{id}, nil
+			return []uuid.UUID{id}, nil
 		}
 		fallthrough
 	case m.op.Is(OpUpdate | OpDelete):
@@ -191,42 +190,6 @@ func (m *PageMutation) IDs(ctx context.Context) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
-}
-
-// SetReferredID sets the "referred_id" field.
-func (m *PageMutation) SetReferredID(s string) {
-	m.referred_id = &s
-}
-
-// ReferredID returns the value of the "referred_id" field in the mutation.
-func (m *PageMutation) ReferredID() (r string, exists bool) {
-	v := m.referred_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldReferredID returns the old "referred_id" field's value of the Page entity.
-// If the Page object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageMutation) OldReferredID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldReferredID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldReferredID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldReferredID: %w", err)
-	}
-	return oldValue.ReferredID, nil
-}
-
-// ResetReferredID resets all changes to the "referred_id" field.
-func (m *PageMutation) ResetReferredID() {
-	m.referred_id = nil
 }
 
 // SetCrawlingVersion sets the "crawling_version" field.
@@ -373,40 +336,40 @@ func (m *PageMutation) ResetIsHTTPS() {
 	m.is_https = nil
 }
 
-// SetIndexedURL sets the "indexed_url" field.
-func (m *PageMutation) SetIndexedURL(s string) {
-	m.indexed_url = &s
+// SetURL sets the "url" field.
+func (m *PageMutation) SetURL(s string) {
+	m.url = &s
 }
 
-// IndexedURL returns the value of the "indexed_url" field in the mutation.
-func (m *PageMutation) IndexedURL() (r string, exists bool) {
-	v := m.indexed_url
+// URL returns the value of the "url" field in the mutation.
+func (m *PageMutation) URL() (r string, exists bool) {
+	v := m.url
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldIndexedURL returns the old "indexed_url" field's value of the Page entity.
+// OldURL returns the old "url" field's value of the Page entity.
 // If the Page object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageMutation) OldIndexedURL(ctx context.Context) (v string, err error) {
+func (m *PageMutation) OldURL(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldIndexedURL is only allowed on UpdateOne operations")
+		return v, errors.New("OldURL is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldIndexedURL requires an ID field in the mutation")
+		return v, errors.New("OldURL requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldIndexedURL: %w", err)
+		return v, fmt.Errorf("querying old value for OldURL: %w", err)
 	}
-	return oldValue.IndexedURL, nil
+	return oldValue.URL, nil
 }
 
-// ResetIndexedURL resets all changes to the "indexed_url" field.
-func (m *PageMutation) ResetIndexedURL() {
-	m.indexed_url = nil
+// ResetURL resets all changes to the "url" field.
+func (m *PageMutation) ResetURL() {
+	m.url = nil
 }
 
 // SetPath sets the "path" field.
@@ -479,42 +442,6 @@ func (m *PageMutation) OldQuerystring(ctx context.Context) (v string, err error)
 // ResetQuerystring resets all changes to the "querystring" field.
 func (m *PageMutation) ResetQuerystring() {
 	m.querystring = nil
-}
-
-// SetURL sets the "url" field.
-func (m *PageMutation) SetURL(s string) {
-	m.url = &s
-}
-
-// URL returns the value of the "url" field in the mutation.
-func (m *PageMutation) URL() (r string, exists bool) {
-	v := m.url
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldURL returns the old "url" field's value of the Page entity.
-// If the Page object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageMutation) OldURL(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldURL is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldURL requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldURL: %w", err)
-	}
-	return oldValue.URL, nil
-}
-
-// ResetURL resets all changes to the "url" field.
-func (m *PageMutation) ResetURL() {
-	m.url = nil
 }
 
 // SetCountReferred sets the "count_referred" field.
@@ -1726,9 +1653,9 @@ func (m *PageMutation) ResetOgVideoHeight() {
 }
 
 // AddPageSourceIDs adds the "page_source" edge to the PageSource entity by ids.
-func (m *PageMutation) AddPageSourceIDs(ids ...string) {
+func (m *PageMutation) AddPageSourceIDs(ids ...uuid.UUID) {
 	if m.page_source == nil {
-		m.page_source = make(map[string]struct{})
+		m.page_source = make(map[uuid.UUID]struct{})
 	}
 	for i := range ids {
 		m.page_source[ids[i]] = struct{}{}
@@ -1746,9 +1673,9 @@ func (m *PageMutation) PageSourceCleared() bool {
 }
 
 // RemovePageSourceIDs removes the "page_source" edge to the PageSource entity by IDs.
-func (m *PageMutation) RemovePageSourceIDs(ids ...string) {
+func (m *PageMutation) RemovePageSourceIDs(ids ...uuid.UUID) {
 	if m.removedpage_source == nil {
-		m.removedpage_source = make(map[string]struct{})
+		m.removedpage_source = make(map[uuid.UUID]struct{})
 	}
 	for i := range ids {
 		delete(m.page_source, ids[i])
@@ -1757,7 +1684,7 @@ func (m *PageMutation) RemovePageSourceIDs(ids ...string) {
 }
 
 // RemovedPageSource returns the removed IDs of the "page_source" edge to the PageSource entity.
-func (m *PageMutation) RemovedPageSourceIDs() (ids []string) {
+func (m *PageMutation) RemovedPageSourceIDs() (ids []uuid.UUID) {
 	for id := range m.removedpage_source {
 		ids = append(ids, id)
 	}
@@ -1765,7 +1692,7 @@ func (m *PageMutation) RemovedPageSourceIDs() (ids []string) {
 }
 
 // PageSourceIDs returns the "page_source" edge IDs in the mutation.
-func (m *PageMutation) PageSourceIDs() (ids []string) {
+func (m *PageMutation) PageSourceIDs() (ids []uuid.UUID) {
 	for id := range m.page_source {
 		ids = append(ids, id)
 	}
@@ -1798,10 +1725,7 @@ func (m *PageMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PageMutation) Fields() []string {
-	fields := make([]string, 0, 42)
-	if m.referred_id != nil {
-		fields = append(fields, page.FieldReferredID)
-	}
+	fields := make([]string, 0, 40)
 	if m.crawling_version != nil {
 		fields = append(fields, page.FieldCrawlingVersion)
 	}
@@ -1814,17 +1738,14 @@ func (m *PageMutation) Fields() []string {
 	if m.is_https != nil {
 		fields = append(fields, page.FieldIsHTTPS)
 	}
-	if m.indexed_url != nil {
-		fields = append(fields, page.FieldIndexedURL)
+	if m.url != nil {
+		fields = append(fields, page.FieldURL)
 	}
 	if m._path != nil {
 		fields = append(fields, page.FieldPath)
 	}
 	if m.querystring != nil {
 		fields = append(fields, page.FieldQuerystring)
-	}
-	if m.url != nil {
-		fields = append(fields, page.FieldURL)
 	}
 	if m.count_referred != nil {
 		fields = append(fields, page.FieldCountReferred)
@@ -1933,8 +1854,6 @@ func (m *PageMutation) Fields() []string {
 // schema.
 func (m *PageMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case page.FieldReferredID:
-		return m.ReferredID()
 	case page.FieldCrawlingVersion:
 		return m.CrawlingVersion()
 	case page.FieldDomain:
@@ -1943,14 +1862,12 @@ func (m *PageMutation) Field(name string) (ent.Value, bool) {
 		return m.Port()
 	case page.FieldIsHTTPS:
 		return m.IsHTTPS()
-	case page.FieldIndexedURL:
-		return m.IndexedURL()
+	case page.FieldURL:
+		return m.URL()
 	case page.FieldPath:
 		return m.Path()
 	case page.FieldQuerystring:
 		return m.Querystring()
-	case page.FieldURL:
-		return m.URL()
 	case page.FieldCountReferred:
 		return m.CountReferred()
 	case page.FieldStatus:
@@ -2026,8 +1943,6 @@ func (m *PageMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *PageMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
-	case page.FieldReferredID:
-		return m.OldReferredID(ctx)
 	case page.FieldCrawlingVersion:
 		return m.OldCrawlingVersion(ctx)
 	case page.FieldDomain:
@@ -2036,14 +1951,12 @@ func (m *PageMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldPort(ctx)
 	case page.FieldIsHTTPS:
 		return m.OldIsHTTPS(ctx)
-	case page.FieldIndexedURL:
-		return m.OldIndexedURL(ctx)
+	case page.FieldURL:
+		return m.OldURL(ctx)
 	case page.FieldPath:
 		return m.OldPath(ctx)
 	case page.FieldQuerystring:
 		return m.OldQuerystring(ctx)
-	case page.FieldURL:
-		return m.OldURL(ctx)
 	case page.FieldCountReferred:
 		return m.OldCountReferred(ctx)
 	case page.FieldStatus:
@@ -2119,13 +2032,6 @@ func (m *PageMutation) OldField(ctx context.Context, name string) (ent.Value, er
 // type.
 func (m *PageMutation) SetField(name string, value ent.Value) error {
 	switch name {
-	case page.FieldReferredID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetReferredID(v)
-		return nil
 	case page.FieldCrawlingVersion:
 		v, ok := value.(string)
 		if !ok {
@@ -2154,12 +2060,12 @@ func (m *PageMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIsHTTPS(v)
 		return nil
-	case page.FieldIndexedURL:
+	case page.FieldURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetIndexedURL(v)
+		m.SetURL(v)
 		return nil
 	case page.FieldPath:
 		v, ok := value.(string)
@@ -2174,13 +2080,6 @@ func (m *PageMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetQuerystring(v)
-		return nil
-	case page.FieldURL:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetURL(v)
 		return nil
 	case page.FieldCountReferred:
 		v, ok := value.(int64)
@@ -2477,9 +2376,6 @@ func (m *PageMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *PageMutation) ResetField(name string) error {
 	switch name {
-	case page.FieldReferredID:
-		m.ResetReferredID()
-		return nil
 	case page.FieldCrawlingVersion:
 		m.ResetCrawlingVersion()
 		return nil
@@ -2492,17 +2388,14 @@ func (m *PageMutation) ResetField(name string) error {
 	case page.FieldIsHTTPS:
 		m.ResetIsHTTPS()
 		return nil
-	case page.FieldIndexedURL:
-		m.ResetIndexedURL()
+	case page.FieldURL:
+		m.ResetURL()
 		return nil
 	case page.FieldPath:
 		m.ResetPath()
 		return nil
 	case page.FieldQuerystring:
 		m.ResetQuerystring()
-		return nil
-	case page.FieldURL:
-		m.ResetURL()
 		return nil
 	case page.FieldCountReferred:
 		m.ResetCountReferred()
@@ -2691,37 +2584,35 @@ func (m *PageMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Page edge %s", name)
 }
 
-// PageLinkMutation represents an operation that mutates the PageLink nodes in the graph.
-type PageLinkMutation struct {
+// PageReferredMutation represents an operation that mutates the PageReferred nodes in the graph.
+type PageReferredMutation struct {
 	config
 	op            Op
 	typ           string
-	id            *int64
-	source_id     *int64
-	addsource_id  *int64
-	target_id     *int64
-	addtarget_id  *int64
+	id            *uuid.UUID
+	source_id     *uuid.UUID
+	target_id     *uuid.UUID
 	created_at    *time.Time
 	created_by    *string
 	updated_at    *time.Time
 	updated_by    *string
 	clearedFields map[string]struct{}
 	done          bool
-	oldValue      func(context.Context) (*PageLink, error)
-	predicates    []predicate.PageLink
+	oldValue      func(context.Context) (*PageReferred, error)
+	predicates    []predicate.PageReferred
 }
 
-var _ ent.Mutation = (*PageLinkMutation)(nil)
+var _ ent.Mutation = (*PageReferredMutation)(nil)
 
-// pagelinkOption allows management of the mutation configuration using functional options.
-type pagelinkOption func(*PageLinkMutation)
+// pagereferredOption allows management of the mutation configuration using functional options.
+type pagereferredOption func(*PageReferredMutation)
 
-// newPageLinkMutation creates new mutation for the PageLink entity.
-func newPageLinkMutation(c config, op Op, opts ...pagelinkOption) *PageLinkMutation {
-	m := &PageLinkMutation{
+// newPageReferredMutation creates new mutation for the PageReferred entity.
+func newPageReferredMutation(c config, op Op, opts ...pagereferredOption) *PageReferredMutation {
+	m := &PageReferredMutation{
 		config:        c,
 		op:            op,
-		typ:           TypePageLink,
+		typ:           TypePageReferred,
 		clearedFields: make(map[string]struct{}),
 	}
 	for _, opt := range opts {
@@ -2730,20 +2621,20 @@ func newPageLinkMutation(c config, op Op, opts ...pagelinkOption) *PageLinkMutat
 	return m
 }
 
-// withPageLinkID sets the ID field of the mutation.
-func withPageLinkID(id int64) pagelinkOption {
-	return func(m *PageLinkMutation) {
+// withPageReferredID sets the ID field of the mutation.
+func withPageReferredID(id uuid.UUID) pagereferredOption {
+	return func(m *PageReferredMutation) {
 		var (
 			err   error
 			once  sync.Once
-			value *PageLink
+			value *PageReferred
 		)
-		m.oldValue = func(ctx context.Context) (*PageLink, error) {
+		m.oldValue = func(ctx context.Context) (*PageReferred, error) {
 			once.Do(func() {
 				if m.done {
 					err = errors.New("querying old values post mutation is not allowed")
 				} else {
-					value, err = m.Client().PageLink.Get(ctx, id)
+					value, err = m.Client().PageReferred.Get(ctx, id)
 				}
 			})
 			return value, err
@@ -2752,10 +2643,10 @@ func withPageLinkID(id int64) pagelinkOption {
 	}
 }
 
-// withPageLink sets the old PageLink of the mutation.
-func withPageLink(node *PageLink) pagelinkOption {
-	return func(m *PageLinkMutation) {
-		m.oldValue = func(context.Context) (*PageLink, error) {
+// withPageReferred sets the old PageReferred of the mutation.
+func withPageReferred(node *PageReferred) pagereferredOption {
+	return func(m *PageReferredMutation) {
+		m.oldValue = func(context.Context) (*PageReferred, error) {
 			return node, nil
 		}
 		m.id = &node.ID
@@ -2764,7 +2655,7 @@ func withPageLink(node *PageLink) pagelinkOption {
 
 // Client returns a new `ent.Client` from the mutation. If the mutation was
 // executed in a transaction (ent.Tx), a transactional client is returned.
-func (m PageLinkMutation) Client() *Client {
+func (m PageReferredMutation) Client() *Client {
 	client := &Client{config: m.config}
 	client.init()
 	return client
@@ -2772,7 +2663,7 @@ func (m PageLinkMutation) Client() *Client {
 
 // Tx returns an `ent.Tx` for mutations that were executed in transactions;
 // it returns an error otherwise.
-func (m PageLinkMutation) Tx() (*Tx, error) {
+func (m PageReferredMutation) Tx() (*Tx, error) {
 	if _, ok := m.driver.(*txDriver); !ok {
 		return nil, errors.New("ent: mutation is not running in a transaction")
 	}
@@ -2782,14 +2673,14 @@ func (m PageLinkMutation) Tx() (*Tx, error) {
 }
 
 // SetID sets the value of the id field. Note that this
-// operation is only accepted on creation of PageLink entities.
-func (m *PageLinkMutation) SetID(id int64) {
+// operation is only accepted on creation of PageReferred entities.
+func (m *PageReferredMutation) SetID(id uuid.UUID) {
 	m.id = &id
 }
 
 // ID returns the ID value in the mutation. Note that the ID is only available
 // if it was provided to the builder or after it was returned from the database.
-func (m *PageLinkMutation) ID() (id int64, exists bool) {
+func (m *PageReferredMutation) ID() (id uuid.UUID, exists bool) {
 	if m.id == nil {
 		return
 	}
@@ -2800,29 +2691,28 @@ func (m *PageLinkMutation) ID() (id int64, exists bool) {
 // That means, if the mutation is applied within a transaction with an isolation level such
 // as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
 // or updated by the mutation.
-func (m *PageLinkMutation) IDs(ctx context.Context) ([]int64, error) {
+func (m *PageReferredMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
 	switch {
 	case m.op.Is(OpUpdateOne | OpDeleteOne):
 		id, exists := m.ID()
 		if exists {
-			return []int64{id}, nil
+			return []uuid.UUID{id}, nil
 		}
 		fallthrough
 	case m.op.Is(OpUpdate | OpDelete):
-		return m.Client().PageLink.Query().Where(m.predicates...).IDs(ctx)
+		return m.Client().PageReferred.Query().Where(m.predicates...).IDs(ctx)
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
 }
 
 // SetSourceID sets the "source_id" field.
-func (m *PageLinkMutation) SetSourceID(i int64) {
-	m.source_id = &i
-	m.addsource_id = nil
+func (m *PageReferredMutation) SetSourceID(u uuid.UUID) {
+	m.source_id = &u
 }
 
 // SourceID returns the value of the "source_id" field in the mutation.
-func (m *PageLinkMutation) SourceID() (r int64, exists bool) {
+func (m *PageReferredMutation) SourceID() (r uuid.UUID, exists bool) {
 	v := m.source_id
 	if v == nil {
 		return
@@ -2830,10 +2720,10 @@ func (m *PageLinkMutation) SourceID() (r int64, exists bool) {
 	return *v, true
 }
 
-// OldSourceID returns the old "source_id" field's value of the PageLink entity.
-// If the PageLink object wasn't provided to the builder, the object is fetched from the database.
+// OldSourceID returns the old "source_id" field's value of the PageReferred entity.
+// If the PageReferred object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageLinkMutation) OldSourceID(ctx context.Context) (v int64, err error) {
+func (m *PageReferredMutation) OldSourceID(ctx context.Context) (v uuid.UUID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldSourceID is only allowed on UpdateOne operations")
 	}
@@ -2847,38 +2737,18 @@ func (m *PageLinkMutation) OldSourceID(ctx context.Context) (v int64, err error)
 	return oldValue.SourceID, nil
 }
 
-// AddSourceID adds i to the "source_id" field.
-func (m *PageLinkMutation) AddSourceID(i int64) {
-	if m.addsource_id != nil {
-		*m.addsource_id += i
-	} else {
-		m.addsource_id = &i
-	}
-}
-
-// AddedSourceID returns the value that was added to the "source_id" field in this mutation.
-func (m *PageLinkMutation) AddedSourceID() (r int64, exists bool) {
-	v := m.addsource_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
 // ResetSourceID resets all changes to the "source_id" field.
-func (m *PageLinkMutation) ResetSourceID() {
+func (m *PageReferredMutation) ResetSourceID() {
 	m.source_id = nil
-	m.addsource_id = nil
 }
 
 // SetTargetID sets the "target_id" field.
-func (m *PageLinkMutation) SetTargetID(i int64) {
-	m.target_id = &i
-	m.addtarget_id = nil
+func (m *PageReferredMutation) SetTargetID(u uuid.UUID) {
+	m.target_id = &u
 }
 
 // TargetID returns the value of the "target_id" field in the mutation.
-func (m *PageLinkMutation) TargetID() (r int64, exists bool) {
+func (m *PageReferredMutation) TargetID() (r uuid.UUID, exists bool) {
 	v := m.target_id
 	if v == nil {
 		return
@@ -2886,10 +2756,10 @@ func (m *PageLinkMutation) TargetID() (r int64, exists bool) {
 	return *v, true
 }
 
-// OldTargetID returns the old "target_id" field's value of the PageLink entity.
-// If the PageLink object wasn't provided to the builder, the object is fetched from the database.
+// OldTargetID returns the old "target_id" field's value of the PageReferred entity.
+// If the PageReferred object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageLinkMutation) OldTargetID(ctx context.Context) (v int64, err error) {
+func (m *PageReferredMutation) OldTargetID(ctx context.Context) (v uuid.UUID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTargetID is only allowed on UpdateOne operations")
 	}
@@ -2903,37 +2773,18 @@ func (m *PageLinkMutation) OldTargetID(ctx context.Context) (v int64, err error)
 	return oldValue.TargetID, nil
 }
 
-// AddTargetID adds i to the "target_id" field.
-func (m *PageLinkMutation) AddTargetID(i int64) {
-	if m.addtarget_id != nil {
-		*m.addtarget_id += i
-	} else {
-		m.addtarget_id = &i
-	}
-}
-
-// AddedTargetID returns the value that was added to the "target_id" field in this mutation.
-func (m *PageLinkMutation) AddedTargetID() (r int64, exists bool) {
-	v := m.addtarget_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
 // ResetTargetID resets all changes to the "target_id" field.
-func (m *PageLinkMutation) ResetTargetID() {
+func (m *PageReferredMutation) ResetTargetID() {
 	m.target_id = nil
-	m.addtarget_id = nil
 }
 
 // SetCreatedAt sets the "created_at" field.
-func (m *PageLinkMutation) SetCreatedAt(t time.Time) {
+func (m *PageReferredMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
 }
 
 // CreatedAt returns the value of the "created_at" field in the mutation.
-func (m *PageLinkMutation) CreatedAt() (r time.Time, exists bool) {
+func (m *PageReferredMutation) CreatedAt() (r time.Time, exists bool) {
 	v := m.created_at
 	if v == nil {
 		return
@@ -2941,10 +2792,10 @@ func (m *PageLinkMutation) CreatedAt() (r time.Time, exists bool) {
 	return *v, true
 }
 
-// OldCreatedAt returns the old "created_at" field's value of the PageLink entity.
-// If the PageLink object wasn't provided to the builder, the object is fetched from the database.
+// OldCreatedAt returns the old "created_at" field's value of the PageReferred entity.
+// If the PageReferred object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageLinkMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+func (m *PageReferredMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
 	}
@@ -2959,17 +2810,17 @@ func (m *PageLinkMutation) OldCreatedAt(ctx context.Context) (v time.Time, err e
 }
 
 // ResetCreatedAt resets all changes to the "created_at" field.
-func (m *PageLinkMutation) ResetCreatedAt() {
+func (m *PageReferredMutation) ResetCreatedAt() {
 	m.created_at = nil
 }
 
 // SetCreatedBy sets the "created_by" field.
-func (m *PageLinkMutation) SetCreatedBy(s string) {
+func (m *PageReferredMutation) SetCreatedBy(s string) {
 	m.created_by = &s
 }
 
 // CreatedBy returns the value of the "created_by" field in the mutation.
-func (m *PageLinkMutation) CreatedBy() (r string, exists bool) {
+func (m *PageReferredMutation) CreatedBy() (r string, exists bool) {
 	v := m.created_by
 	if v == nil {
 		return
@@ -2977,10 +2828,10 @@ func (m *PageLinkMutation) CreatedBy() (r string, exists bool) {
 	return *v, true
 }
 
-// OldCreatedBy returns the old "created_by" field's value of the PageLink entity.
-// If the PageLink object wasn't provided to the builder, the object is fetched from the database.
+// OldCreatedBy returns the old "created_by" field's value of the PageReferred entity.
+// If the PageReferred object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageLinkMutation) OldCreatedBy(ctx context.Context) (v string, err error) {
+func (m *PageReferredMutation) OldCreatedBy(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCreatedBy is only allowed on UpdateOne operations")
 	}
@@ -2995,17 +2846,17 @@ func (m *PageLinkMutation) OldCreatedBy(ctx context.Context) (v string, err erro
 }
 
 // ResetCreatedBy resets all changes to the "created_by" field.
-func (m *PageLinkMutation) ResetCreatedBy() {
+func (m *PageReferredMutation) ResetCreatedBy() {
 	m.created_by = nil
 }
 
 // SetUpdatedAt sets the "updated_at" field.
-func (m *PageLinkMutation) SetUpdatedAt(t time.Time) {
+func (m *PageReferredMutation) SetUpdatedAt(t time.Time) {
 	m.updated_at = &t
 }
 
 // UpdatedAt returns the value of the "updated_at" field in the mutation.
-func (m *PageLinkMutation) UpdatedAt() (r time.Time, exists bool) {
+func (m *PageReferredMutation) UpdatedAt() (r time.Time, exists bool) {
 	v := m.updated_at
 	if v == nil {
 		return
@@ -3013,10 +2864,10 @@ func (m *PageLinkMutation) UpdatedAt() (r time.Time, exists bool) {
 	return *v, true
 }
 
-// OldUpdatedAt returns the old "updated_at" field's value of the PageLink entity.
-// If the PageLink object wasn't provided to the builder, the object is fetched from the database.
+// OldUpdatedAt returns the old "updated_at" field's value of the PageReferred entity.
+// If the PageReferred object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageLinkMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+func (m *PageReferredMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
 	}
@@ -3031,17 +2882,17 @@ func (m *PageLinkMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err e
 }
 
 // ResetUpdatedAt resets all changes to the "updated_at" field.
-func (m *PageLinkMutation) ResetUpdatedAt() {
+func (m *PageReferredMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
 // SetUpdatedBy sets the "updated_by" field.
-func (m *PageLinkMutation) SetUpdatedBy(s string) {
+func (m *PageReferredMutation) SetUpdatedBy(s string) {
 	m.updated_by = &s
 }
 
 // UpdatedBy returns the value of the "updated_by" field in the mutation.
-func (m *PageLinkMutation) UpdatedBy() (r string, exists bool) {
+func (m *PageReferredMutation) UpdatedBy() (r string, exists bool) {
 	v := m.updated_by
 	if v == nil {
 		return
@@ -3049,10 +2900,10 @@ func (m *PageLinkMutation) UpdatedBy() (r string, exists bool) {
 	return *v, true
 }
 
-// OldUpdatedBy returns the old "updated_by" field's value of the PageLink entity.
-// If the PageLink object wasn't provided to the builder, the object is fetched from the database.
+// OldUpdatedBy returns the old "updated_by" field's value of the PageReferred entity.
+// If the PageReferred object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageLinkMutation) OldUpdatedBy(ctx context.Context) (v string, err error) {
+func (m *PageReferredMutation) OldUpdatedBy(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldUpdatedBy is only allowed on UpdateOne operations")
 	}
@@ -3067,47 +2918,47 @@ func (m *PageLinkMutation) OldUpdatedBy(ctx context.Context) (v string, err erro
 }
 
 // ResetUpdatedBy resets all changes to the "updated_by" field.
-func (m *PageLinkMutation) ResetUpdatedBy() {
+func (m *PageReferredMutation) ResetUpdatedBy() {
 	m.updated_by = nil
 }
 
-// Where appends a list predicates to the PageLinkMutation builder.
-func (m *PageLinkMutation) Where(ps ...predicate.PageLink) {
+// Where appends a list predicates to the PageReferredMutation builder.
+func (m *PageReferredMutation) Where(ps ...predicate.PageReferred) {
 	m.predicates = append(m.predicates, ps...)
 }
 
 // Op returns the operation name.
-func (m *PageLinkMutation) Op() Op {
+func (m *PageReferredMutation) Op() Op {
 	return m.op
 }
 
-// Type returns the node type of this mutation (PageLink).
-func (m *PageLinkMutation) Type() string {
+// Type returns the node type of this mutation (PageReferred).
+func (m *PageReferredMutation) Type() string {
 	return m.typ
 }
 
 // Fields returns all fields that were changed during this mutation. Note that in
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
-func (m *PageLinkMutation) Fields() []string {
+func (m *PageReferredMutation) Fields() []string {
 	fields := make([]string, 0, 6)
 	if m.source_id != nil {
-		fields = append(fields, pagelink.FieldSourceID)
+		fields = append(fields, pagereferred.FieldSourceID)
 	}
 	if m.target_id != nil {
-		fields = append(fields, pagelink.FieldTargetID)
+		fields = append(fields, pagereferred.FieldTargetID)
 	}
 	if m.created_at != nil {
-		fields = append(fields, pagelink.FieldCreatedAt)
+		fields = append(fields, pagereferred.FieldCreatedAt)
 	}
 	if m.created_by != nil {
-		fields = append(fields, pagelink.FieldCreatedBy)
+		fields = append(fields, pagereferred.FieldCreatedBy)
 	}
 	if m.updated_at != nil {
-		fields = append(fields, pagelink.FieldUpdatedAt)
+		fields = append(fields, pagereferred.FieldUpdatedAt)
 	}
 	if m.updated_by != nil {
-		fields = append(fields, pagelink.FieldUpdatedBy)
+		fields = append(fields, pagereferred.FieldUpdatedBy)
 	}
 	return fields
 }
@@ -3115,19 +2966,19 @@ func (m *PageLinkMutation) Fields() []string {
 // Field returns the value of a field with the given name. The second boolean
 // return value indicates that this field was not set, or was not defined in the
 // schema.
-func (m *PageLinkMutation) Field(name string) (ent.Value, bool) {
+func (m *PageReferredMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case pagelink.FieldSourceID:
+	case pagereferred.FieldSourceID:
 		return m.SourceID()
-	case pagelink.FieldTargetID:
+	case pagereferred.FieldTargetID:
 		return m.TargetID()
-	case pagelink.FieldCreatedAt:
+	case pagereferred.FieldCreatedAt:
 		return m.CreatedAt()
-	case pagelink.FieldCreatedBy:
+	case pagereferred.FieldCreatedBy:
 		return m.CreatedBy()
-	case pagelink.FieldUpdatedAt:
+	case pagereferred.FieldUpdatedAt:
 		return m.UpdatedAt()
-	case pagelink.FieldUpdatedBy:
+	case pagereferred.FieldUpdatedBy:
 		return m.UpdatedBy()
 	}
 	return nil, false
@@ -3136,65 +2987,65 @@ func (m *PageLinkMutation) Field(name string) (ent.Value, bool) {
 // OldField returns the old value of the field from the database. An error is
 // returned if the mutation operation is not UpdateOne, or the query to the
 // database failed.
-func (m *PageLinkMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+func (m *PageReferredMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
-	case pagelink.FieldSourceID:
+	case pagereferred.FieldSourceID:
 		return m.OldSourceID(ctx)
-	case pagelink.FieldTargetID:
+	case pagereferred.FieldTargetID:
 		return m.OldTargetID(ctx)
-	case pagelink.FieldCreatedAt:
+	case pagereferred.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
-	case pagelink.FieldCreatedBy:
+	case pagereferred.FieldCreatedBy:
 		return m.OldCreatedBy(ctx)
-	case pagelink.FieldUpdatedAt:
+	case pagereferred.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
-	case pagelink.FieldUpdatedBy:
+	case pagereferred.FieldUpdatedBy:
 		return m.OldUpdatedBy(ctx)
 	}
-	return nil, fmt.Errorf("unknown PageLink field %s", name)
+	return nil, fmt.Errorf("unknown PageReferred field %s", name)
 }
 
 // SetField sets the value of a field with the given name. It returns an error if
 // the field is not defined in the schema, or if the type mismatched the field
 // type.
-func (m *PageLinkMutation) SetField(name string, value ent.Value) error {
+func (m *PageReferredMutation) SetField(name string, value ent.Value) error {
 	switch name {
-	case pagelink.FieldSourceID:
-		v, ok := value.(int64)
+	case pagereferred.FieldSourceID:
+		v, ok := value.(uuid.UUID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSourceID(v)
 		return nil
-	case pagelink.FieldTargetID:
-		v, ok := value.(int64)
+	case pagereferred.FieldTargetID:
+		v, ok := value.(uuid.UUID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTargetID(v)
 		return nil
-	case pagelink.FieldCreatedAt:
+	case pagereferred.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedAt(v)
 		return nil
-	case pagelink.FieldCreatedBy:
+	case pagereferred.FieldCreatedBy:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedBy(v)
 		return nil
-	case pagelink.FieldUpdatedAt:
+	case pagereferred.FieldUpdatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdatedAt(v)
 		return nil
-	case pagelink.FieldUpdatedBy:
+	case pagereferred.FieldUpdatedBy:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
@@ -3202,167 +3053,135 @@ func (m *PageLinkMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdatedBy(v)
 		return nil
 	}
-	return fmt.Errorf("unknown PageLink field %s", name)
+	return fmt.Errorf("unknown PageReferred field %s", name)
 }
 
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
-func (m *PageLinkMutation) AddedFields() []string {
-	var fields []string
-	if m.addsource_id != nil {
-		fields = append(fields, pagelink.FieldSourceID)
-	}
-	if m.addtarget_id != nil {
-		fields = append(fields, pagelink.FieldTargetID)
-	}
-	return fields
+func (m *PageReferredMutation) AddedFields() []string {
+	return nil
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
-func (m *PageLinkMutation) AddedField(name string) (ent.Value, bool) {
-	switch name {
-	case pagelink.FieldSourceID:
-		return m.AddedSourceID()
-	case pagelink.FieldTargetID:
-		return m.AddedTargetID()
-	}
+func (m *PageReferredMutation) AddedField(name string) (ent.Value, bool) {
 	return nil, false
 }
 
 // AddField adds the value to the field with the given name. It returns an error if
 // the field is not defined in the schema, or if the type mismatched the field
 // type.
-func (m *PageLinkMutation) AddField(name string, value ent.Value) error {
+func (m *PageReferredMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case pagelink.FieldSourceID:
-		v, ok := value.(int64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddSourceID(v)
-		return nil
-	case pagelink.FieldTargetID:
-		v, ok := value.(int64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddTargetID(v)
-		return nil
 	}
-	return fmt.Errorf("unknown PageLink numeric field %s", name)
+	return fmt.Errorf("unknown PageReferred numeric field %s", name)
 }
 
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
-func (m *PageLinkMutation) ClearedFields() []string {
+func (m *PageReferredMutation) ClearedFields() []string {
 	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
 // cleared in this mutation.
-func (m *PageLinkMutation) FieldCleared(name string) bool {
+func (m *PageReferredMutation) FieldCleared(name string) bool {
 	_, ok := m.clearedFields[name]
 	return ok
 }
 
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
-func (m *PageLinkMutation) ClearField(name string) error {
-	return fmt.Errorf("unknown PageLink nullable field %s", name)
+func (m *PageReferredMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PageReferred nullable field %s", name)
 }
 
 // ResetField resets all changes in the mutation for the field with the given name.
 // It returns an error if the field is not defined in the schema.
-func (m *PageLinkMutation) ResetField(name string) error {
+func (m *PageReferredMutation) ResetField(name string) error {
 	switch name {
-	case pagelink.FieldSourceID:
+	case pagereferred.FieldSourceID:
 		m.ResetSourceID()
 		return nil
-	case pagelink.FieldTargetID:
+	case pagereferred.FieldTargetID:
 		m.ResetTargetID()
 		return nil
-	case pagelink.FieldCreatedAt:
+	case pagereferred.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
-	case pagelink.FieldCreatedBy:
+	case pagereferred.FieldCreatedBy:
 		m.ResetCreatedBy()
 		return nil
-	case pagelink.FieldUpdatedAt:
+	case pagereferred.FieldUpdatedAt:
 		m.ResetUpdatedAt()
 		return nil
-	case pagelink.FieldUpdatedBy:
+	case pagereferred.FieldUpdatedBy:
 		m.ResetUpdatedBy()
 		return nil
 	}
-	return fmt.Errorf("unknown PageLink field %s", name)
+	return fmt.Errorf("unknown PageReferred field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
-func (m *PageLinkMutation) AddedEdges() []string {
+func (m *PageReferredMutation) AddedEdges() []string {
 	edges := make([]string, 0, 0)
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
-func (m *PageLinkMutation) AddedIDs(name string) []ent.Value {
+func (m *PageReferredMutation) AddedIDs(name string) []ent.Value {
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
-func (m *PageLinkMutation) RemovedEdges() []string {
+func (m *PageReferredMutation) RemovedEdges() []string {
 	edges := make([]string, 0, 0)
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
-func (m *PageLinkMutation) RemovedIDs(name string) []ent.Value {
+func (m *PageReferredMutation) RemovedIDs(name string) []ent.Value {
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
-func (m *PageLinkMutation) ClearedEdges() []string {
+func (m *PageReferredMutation) ClearedEdges() []string {
 	edges := make([]string, 0, 0)
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
-func (m *PageLinkMutation) EdgeCleared(name string) bool {
+func (m *PageReferredMutation) EdgeCleared(name string) bool {
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
-func (m *PageLinkMutation) ClearEdge(name string) error {
-	return fmt.Errorf("unknown PageLink unique edge %s", name)
+func (m *PageReferredMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PageReferred unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
-func (m *PageLinkMutation) ResetEdge(name string) error {
-	return fmt.Errorf("unknown PageLink edge %s", name)
+func (m *PageReferredMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PageReferred edge %s", name)
 }
 
 // PageSourceMutation represents an operation that mutates the PageSource nodes in the graph.
 type PageSourceMutation struct {
 	config
-	op               Op
-	typ              string
-	id               *string
-	referred_page_id *string
-	url              *string
-	referred_url     *string
-	source           *string
-	clearedFields    map[string]struct{}
-	page             *string
-	clearedpage      bool
-	done             bool
-	oldValue         func(context.Context) (*PageSource, error)
-	predicates       []predicate.PageSource
+	op            Op
+	typ           string
+	id            *uuid.UUID
+	source        *string
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PageSource, error)
+	predicates    []predicate.PageSource
 }
 
 var _ ent.Mutation = (*PageSourceMutation)(nil)
@@ -3385,7 +3204,7 @@ func newPageSourceMutation(c config, op Op, opts ...pagesourceOption) *PageSourc
 }
 
 // withPageSourceID sets the ID field of the mutation.
-func withPageSourceID(id string) pagesourceOption {
+func withPageSourceID(id uuid.UUID) pagesourceOption {
 	return func(m *PageSourceMutation) {
 		var (
 			err   error
@@ -3437,13 +3256,13 @@ func (m PageSourceMutation) Tx() (*Tx, error) {
 
 // SetID sets the value of the id field. Note that this
 // operation is only accepted on creation of PageSource entities.
-func (m *PageSourceMutation) SetID(id string) {
+func (m *PageSourceMutation) SetID(id uuid.UUID) {
 	m.id = &id
 }
 
 // ID returns the ID value in the mutation. Note that the ID is only available
 // if it was provided to the builder or after it was returned from the database.
-func (m *PageSourceMutation) ID() (id string, exists bool) {
+func (m *PageSourceMutation) ID() (id uuid.UUID, exists bool) {
 	if m.id == nil {
 		return
 	}
@@ -3454,12 +3273,12 @@ func (m *PageSourceMutation) ID() (id string, exists bool) {
 // That means, if the mutation is applied within a transaction with an isolation level such
 // as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
 // or updated by the mutation.
-func (m *PageSourceMutation) IDs(ctx context.Context) ([]string, error) {
+func (m *PageSourceMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
 	switch {
 	case m.op.Is(OpUpdateOne | OpDeleteOne):
 		id, exists := m.ID()
 		if exists {
-			return []string{id}, nil
+			return []uuid.UUID{id}, nil
 		}
 		fallthrough
 	case m.op.Is(OpUpdate | OpDelete):
@@ -3467,150 +3286,6 @@ func (m *PageSourceMutation) IDs(ctx context.Context) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
-}
-
-// SetPageID sets the "page_id" field.
-func (m *PageSourceMutation) SetPageID(s string) {
-	m.page = &s
-}
-
-// PageID returns the value of the "page_id" field in the mutation.
-func (m *PageSourceMutation) PageID() (r string, exists bool) {
-	v := m.page
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldPageID returns the old "page_id" field's value of the PageSource entity.
-// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageSourceMutation) OldPageID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldPageID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldPageID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldPageID: %w", err)
-	}
-	return oldValue.PageID, nil
-}
-
-// ResetPageID resets all changes to the "page_id" field.
-func (m *PageSourceMutation) ResetPageID() {
-	m.page = nil
-}
-
-// SetReferredPageID sets the "referred_page_id" field.
-func (m *PageSourceMutation) SetReferredPageID(s string) {
-	m.referred_page_id = &s
-}
-
-// ReferredPageID returns the value of the "referred_page_id" field in the mutation.
-func (m *PageSourceMutation) ReferredPageID() (r string, exists bool) {
-	v := m.referred_page_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldReferredPageID returns the old "referred_page_id" field's value of the PageSource entity.
-// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageSourceMutation) OldReferredPageID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldReferredPageID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldReferredPageID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldReferredPageID: %w", err)
-	}
-	return oldValue.ReferredPageID, nil
-}
-
-// ResetReferredPageID resets all changes to the "referred_page_id" field.
-func (m *PageSourceMutation) ResetReferredPageID() {
-	m.referred_page_id = nil
-}
-
-// SetURL sets the "url" field.
-func (m *PageSourceMutation) SetURL(s string) {
-	m.url = &s
-}
-
-// URL returns the value of the "url" field in the mutation.
-func (m *PageSourceMutation) URL() (r string, exists bool) {
-	v := m.url
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldURL returns the old "url" field's value of the PageSource entity.
-// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageSourceMutation) OldURL(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldURL is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldURL requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldURL: %w", err)
-	}
-	return oldValue.URL, nil
-}
-
-// ResetURL resets all changes to the "url" field.
-func (m *PageSourceMutation) ResetURL() {
-	m.url = nil
-}
-
-// SetReferredURL sets the "referred_url" field.
-func (m *PageSourceMutation) SetReferredURL(s string) {
-	m.referred_url = &s
-}
-
-// ReferredURL returns the value of the "referred_url" field in the mutation.
-func (m *PageSourceMutation) ReferredURL() (r string, exists bool) {
-	v := m.referred_url
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldReferredURL returns the old "referred_url" field's value of the PageSource entity.
-// If the PageSource object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PageSourceMutation) OldReferredURL(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldReferredURL is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldReferredURL requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldReferredURL: %w", err)
-	}
-	return oldValue.ReferredURL, nil
-}
-
-// ResetReferredURL resets all changes to the "referred_url" field.
-func (m *PageSourceMutation) ResetReferredURL() {
-	m.referred_url = nil
 }
 
 // SetSource sets the "source" field.
@@ -3649,32 +3324,6 @@ func (m *PageSourceMutation) ResetSource() {
 	m.source = nil
 }
 
-// ClearPage clears the "page" edge to the Page entity.
-func (m *PageSourceMutation) ClearPage() {
-	m.clearedpage = true
-}
-
-// PageCleared reports if the "page" edge to the Page entity was cleared.
-func (m *PageSourceMutation) PageCleared() bool {
-	return m.clearedpage
-}
-
-// PageIDs returns the "page" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// PageID instead. It exists only for internal usage by the builders.
-func (m *PageSourceMutation) PageIDs() (ids []string) {
-	if id := m.page; id != nil {
-		ids = append(ids, *id)
-	}
-	return
-}
-
-// ResetPage resets all changes to the "page" edge.
-func (m *PageSourceMutation) ResetPage() {
-	m.page = nil
-	m.clearedpage = false
-}
-
 // Where appends a list predicates to the PageSourceMutation builder.
 func (m *PageSourceMutation) Where(ps ...predicate.PageSource) {
 	m.predicates = append(m.predicates, ps...)
@@ -3694,19 +3343,7 @@ func (m *PageSourceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PageSourceMutation) Fields() []string {
-	fields := make([]string, 0, 5)
-	if m.page != nil {
-		fields = append(fields, pagesource.FieldPageID)
-	}
-	if m.referred_page_id != nil {
-		fields = append(fields, pagesource.FieldReferredPageID)
-	}
-	if m.url != nil {
-		fields = append(fields, pagesource.FieldURL)
-	}
-	if m.referred_url != nil {
-		fields = append(fields, pagesource.FieldReferredURL)
-	}
+	fields := make([]string, 0, 1)
 	if m.source != nil {
 		fields = append(fields, pagesource.FieldSource)
 	}
@@ -3718,14 +3355,6 @@ func (m *PageSourceMutation) Fields() []string {
 // schema.
 func (m *PageSourceMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case pagesource.FieldPageID:
-		return m.PageID()
-	case pagesource.FieldReferredPageID:
-		return m.ReferredPageID()
-	case pagesource.FieldURL:
-		return m.URL()
-	case pagesource.FieldReferredURL:
-		return m.ReferredURL()
 	case pagesource.FieldSource:
 		return m.Source()
 	}
@@ -3737,14 +3366,6 @@ func (m *PageSourceMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *PageSourceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
-	case pagesource.FieldPageID:
-		return m.OldPageID(ctx)
-	case pagesource.FieldReferredPageID:
-		return m.OldReferredPageID(ctx)
-	case pagesource.FieldURL:
-		return m.OldURL(ctx)
-	case pagesource.FieldReferredURL:
-		return m.OldReferredURL(ctx)
 	case pagesource.FieldSource:
 		return m.OldSource(ctx)
 	}
@@ -3756,34 +3377,6 @@ func (m *PageSourceMutation) OldField(ctx context.Context, name string) (ent.Val
 // type.
 func (m *PageSourceMutation) SetField(name string, value ent.Value) error {
 	switch name {
-	case pagesource.FieldPageID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetPageID(v)
-		return nil
-	case pagesource.FieldReferredPageID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetReferredPageID(v)
-		return nil
-	case pagesource.FieldURL:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetURL(v)
-		return nil
-	case pagesource.FieldReferredURL:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetReferredURL(v)
-		return nil
 	case pagesource.FieldSource:
 		v, ok := value.(string)
 		if !ok {
@@ -3840,18 +3433,6 @@ func (m *PageSourceMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *PageSourceMutation) ResetField(name string) error {
 	switch name {
-	case pagesource.FieldPageID:
-		m.ResetPageID()
-		return nil
-	case pagesource.FieldReferredPageID:
-		m.ResetReferredPageID()
-		return nil
-	case pagesource.FieldURL:
-		m.ResetURL()
-		return nil
-	case pagesource.FieldReferredURL:
-		m.ResetReferredURL()
-		return nil
 	case pagesource.FieldSource:
 		m.ResetSource()
 		return nil
@@ -3861,28 +3442,19 @@ func (m *PageSourceMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PageSourceMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.page != nil {
-		edges = append(edges, pagesource.EdgePage)
-	}
+	edges := make([]string, 0, 0)
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *PageSourceMutation) AddedIDs(name string) []ent.Value {
-	switch name {
-	case pagesource.EdgePage:
-		if id := m.page; id != nil {
-			return []ent.Value{*id}
-		}
-	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PageSourceMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 0)
 	return edges
 }
 
@@ -3894,41 +3466,24 @@ func (m *PageSourceMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PageSourceMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.clearedpage {
-		edges = append(edges, pagesource.EdgePage)
-	}
+	edges := make([]string, 0, 0)
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *PageSourceMutation) EdgeCleared(name string) bool {
-	switch name {
-	case pagesource.EdgePage:
-		return m.clearedpage
-	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *PageSourceMutation) ClearEdge(name string) error {
-	switch name {
-	case pagesource.EdgePage:
-		m.ClearPage()
-		return nil
-	}
 	return fmt.Errorf("unknown PageSource unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *PageSourceMutation) ResetEdge(name string) error {
-	switch name {
-	case pagesource.EdgePage:
-		m.ResetPage()
-		return nil
-	}
 	return fmt.Errorf("unknown PageSource edge %s", name)
 }

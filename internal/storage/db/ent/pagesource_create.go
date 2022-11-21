@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
+	"github.com/google/uuid"
 )
 
 // PageSourceCreate is the builder for creating a PageSource entity.
@@ -21,46 +21,6 @@ type PageSourceCreate struct {
 	mutation *PageSourceMutation
 	hooks    []Hook
 	conflict []sql.ConflictOption
-}
-
-// SetPageID sets the "page_id" field.
-func (psc *PageSourceCreate) SetPageID(s string) *PageSourceCreate {
-	psc.mutation.SetPageID(s)
-	return psc
-}
-
-// SetReferredPageID sets the "referred_page_id" field.
-func (psc *PageSourceCreate) SetReferredPageID(s string) *PageSourceCreate {
-	psc.mutation.SetReferredPageID(s)
-	return psc
-}
-
-// SetURL sets the "url" field.
-func (psc *PageSourceCreate) SetURL(s string) *PageSourceCreate {
-	psc.mutation.SetURL(s)
-	return psc
-}
-
-// SetNillableURL sets the "url" field if the given value is not nil.
-func (psc *PageSourceCreate) SetNillableURL(s *string) *PageSourceCreate {
-	if s != nil {
-		psc.SetURL(*s)
-	}
-	return psc
-}
-
-// SetReferredURL sets the "referred_url" field.
-func (psc *PageSourceCreate) SetReferredURL(s string) *PageSourceCreate {
-	psc.mutation.SetReferredURL(s)
-	return psc
-}
-
-// SetNillableReferredURL sets the "referred_url" field if the given value is not nil.
-func (psc *PageSourceCreate) SetNillableReferredURL(s *string) *PageSourceCreate {
-	if s != nil {
-		psc.SetReferredURL(*s)
-	}
-	return psc
 }
 
 // SetSource sets the "source" field.
@@ -78,14 +38,9 @@ func (psc *PageSourceCreate) SetNillableSource(s *string) *PageSourceCreate {
 }
 
 // SetID sets the "id" field.
-func (psc *PageSourceCreate) SetID(s string) *PageSourceCreate {
-	psc.mutation.SetID(s)
+func (psc *PageSourceCreate) SetID(u uuid.UUID) *PageSourceCreate {
+	psc.mutation.SetID(u)
 	return psc
-}
-
-// SetPage sets the "page" edge to the Page entity.
-func (psc *PageSourceCreate) SetPage(p *Page) *PageSourceCreate {
-	return psc.SetPageID(p.ID)
 }
 
 // Mutation returns the PageSourceMutation object of the builder.
@@ -99,9 +54,7 @@ func (psc *PageSourceCreate) Save(ctx context.Context) (*PageSource, error) {
 		err  error
 		node *PageSource
 	)
-	if err := psc.defaults(); err != nil {
-		return nil, err
-	}
+	psc.defaults()
 	if len(psc.hooks) == 0 {
 		if err = psc.check(); err != nil {
 			return nil, err
@@ -166,41 +119,17 @@ func (psc *PageSourceCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (psc *PageSourceCreate) defaults() error {
-	if _, ok := psc.mutation.URL(); !ok {
-		v := pagesource.DefaultURL
-		psc.mutation.SetURL(v)
-	}
-	if _, ok := psc.mutation.ReferredURL(); !ok {
-		v := pagesource.DefaultReferredURL
-		psc.mutation.SetReferredURL(v)
-	}
+func (psc *PageSourceCreate) defaults() {
 	if _, ok := psc.mutation.Source(); !ok {
 		v := pagesource.DefaultSource
 		psc.mutation.SetSource(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
 func (psc *PageSourceCreate) check() error {
-	if _, ok := psc.mutation.PageID(); !ok {
-		return &ValidationError{Name: "page_id", err: errors.New(`ent: missing required field "PageSource.page_id"`)}
-	}
-	if _, ok := psc.mutation.ReferredPageID(); !ok {
-		return &ValidationError{Name: "referred_page_id", err: errors.New(`ent: missing required field "PageSource.referred_page_id"`)}
-	}
-	if _, ok := psc.mutation.URL(); !ok {
-		return &ValidationError{Name: "url", err: errors.New(`ent: missing required field "PageSource.url"`)}
-	}
-	if _, ok := psc.mutation.ReferredURL(); !ok {
-		return &ValidationError{Name: "referred_url", err: errors.New(`ent: missing required field "PageSource.referred_url"`)}
-	}
 	if _, ok := psc.mutation.Source(); !ok {
 		return &ValidationError{Name: "source", err: errors.New(`ent: missing required field "PageSource.source"`)}
-	}
-	if _, ok := psc.mutation.PageID(); !ok {
-		return &ValidationError{Name: "page", err: errors.New(`ent: missing required edge "PageSource.page"`)}
 	}
 	return nil
 }
@@ -214,10 +143,10 @@ func (psc *PageSourceCreate) sqlSave(ctx context.Context) (*PageSource, error) {
 		return nil, err
 	}
 	if _spec.ID.Value != nil {
-		if id, ok := _spec.ID.Value.(string); ok {
-			_node.ID = id
-		} else {
-			return nil, fmt.Errorf("unexpected PageSource.ID type: %T", _spec.ID.Value)
+		if id, ok := _spec.ID.Value.(*uuid.UUID); ok {
+			_node.ID = *id
+		} else if err := _node.ID.Scan(_spec.ID.Value); err != nil {
+			return nil, err
 		}
 	}
 	return _node, nil
@@ -229,7 +158,7 @@ func (psc *PageSourceCreate) createSpec() (*PageSource, *sqlgraph.CreateSpec) {
 		_spec = &sqlgraph.CreateSpec{
 			Table: pagesource.Table,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: pagesource.FieldID,
 			},
 		}
@@ -237,43 +166,11 @@ func (psc *PageSourceCreate) createSpec() (*PageSource, *sqlgraph.CreateSpec) {
 	_spec.OnConflict = psc.conflict
 	if id, ok := psc.mutation.ID(); ok {
 		_node.ID = id
-		_spec.ID.Value = id
-	}
-	if value, ok := psc.mutation.ReferredPageID(); ok {
-		_spec.SetField(pagesource.FieldReferredPageID, field.TypeString, value)
-		_node.ReferredPageID = value
-	}
-	if value, ok := psc.mutation.URL(); ok {
-		_spec.SetField(pagesource.FieldURL, field.TypeString, value)
-		_node.URL = value
-	}
-	if value, ok := psc.mutation.ReferredURL(); ok {
-		_spec.SetField(pagesource.FieldReferredURL, field.TypeString, value)
-		_node.ReferredURL = value
+		_spec.ID.Value = &id
 	}
 	if value, ok := psc.mutation.Source(); ok {
 		_spec.SetField(pagesource.FieldSource, field.TypeString, value)
 		_node.Source = value
-	}
-	if nodes := psc.mutation.PageIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   pagesource.PageTable,
-			Columns: []string{pagesource.PageColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
-					Column: page.FieldID,
-				},
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.PageID = nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }
@@ -282,7 +179,7 @@ func (psc *PageSourceCreate) createSpec() (*PageSource, *sqlgraph.CreateSpec) {
 // of the `INSERT` statement. For example:
 //
 //	client.PageSource.Create().
-//		SetPageID(v).
+//		SetSource(v).
 //		OnConflict(
 //			// Update the row with the new values
 //			// the was proposed for insertion.
@@ -291,7 +188,7 @@ func (psc *PageSourceCreate) createSpec() (*PageSource, *sqlgraph.CreateSpec) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.PageSourceUpsert) {
-//			SetPageID(v+v).
+//			SetSource(v+v).
 //		}).
 //		Exec(ctx)
 func (psc *PageSourceCreate) OnConflict(opts ...sql.ConflictOption) *PageSourceUpsertOne {
@@ -326,54 +223,6 @@ type (
 		*sql.UpdateSet
 	}
 )
-
-// SetPageID sets the "page_id" field.
-func (u *PageSourceUpsert) SetPageID(v string) *PageSourceUpsert {
-	u.Set(pagesource.FieldPageID, v)
-	return u
-}
-
-// UpdatePageID sets the "page_id" field to the value that was provided on create.
-func (u *PageSourceUpsert) UpdatePageID() *PageSourceUpsert {
-	u.SetExcluded(pagesource.FieldPageID)
-	return u
-}
-
-// SetReferredPageID sets the "referred_page_id" field.
-func (u *PageSourceUpsert) SetReferredPageID(v string) *PageSourceUpsert {
-	u.Set(pagesource.FieldReferredPageID, v)
-	return u
-}
-
-// UpdateReferredPageID sets the "referred_page_id" field to the value that was provided on create.
-func (u *PageSourceUpsert) UpdateReferredPageID() *PageSourceUpsert {
-	u.SetExcluded(pagesource.FieldReferredPageID)
-	return u
-}
-
-// SetURL sets the "url" field.
-func (u *PageSourceUpsert) SetURL(v string) *PageSourceUpsert {
-	u.Set(pagesource.FieldURL, v)
-	return u
-}
-
-// UpdateURL sets the "url" field to the value that was provided on create.
-func (u *PageSourceUpsert) UpdateURL() *PageSourceUpsert {
-	u.SetExcluded(pagesource.FieldURL)
-	return u
-}
-
-// SetReferredURL sets the "referred_url" field.
-func (u *PageSourceUpsert) SetReferredURL(v string) *PageSourceUpsert {
-	u.Set(pagesource.FieldReferredURL, v)
-	return u
-}
-
-// UpdateReferredURL sets the "referred_url" field to the value that was provided on create.
-func (u *PageSourceUpsert) UpdateReferredURL() *PageSourceUpsert {
-	u.SetExcluded(pagesource.FieldReferredURL)
-	return u
-}
 
 // SetSource sets the "source" field.
 func (u *PageSourceUpsert) SetSource(v string) *PageSourceUpsert {
@@ -435,62 +284,6 @@ func (u *PageSourceUpsertOne) Update(set func(*PageSourceUpsert)) *PageSourceUps
 	return u
 }
 
-// SetPageID sets the "page_id" field.
-func (u *PageSourceUpsertOne) SetPageID(v string) *PageSourceUpsertOne {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.SetPageID(v)
-	})
-}
-
-// UpdatePageID sets the "page_id" field to the value that was provided on create.
-func (u *PageSourceUpsertOne) UpdatePageID() *PageSourceUpsertOne {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.UpdatePageID()
-	})
-}
-
-// SetReferredPageID sets the "referred_page_id" field.
-func (u *PageSourceUpsertOne) SetReferredPageID(v string) *PageSourceUpsertOne {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.SetReferredPageID(v)
-	})
-}
-
-// UpdateReferredPageID sets the "referred_page_id" field to the value that was provided on create.
-func (u *PageSourceUpsertOne) UpdateReferredPageID() *PageSourceUpsertOne {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.UpdateReferredPageID()
-	})
-}
-
-// SetURL sets the "url" field.
-func (u *PageSourceUpsertOne) SetURL(v string) *PageSourceUpsertOne {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.SetURL(v)
-	})
-}
-
-// UpdateURL sets the "url" field to the value that was provided on create.
-func (u *PageSourceUpsertOne) UpdateURL() *PageSourceUpsertOne {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.UpdateURL()
-	})
-}
-
-// SetReferredURL sets the "referred_url" field.
-func (u *PageSourceUpsertOne) SetReferredURL(v string) *PageSourceUpsertOne {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.SetReferredURL(v)
-	})
-}
-
-// UpdateReferredURL sets the "referred_url" field to the value that was provided on create.
-func (u *PageSourceUpsertOne) UpdateReferredURL() *PageSourceUpsertOne {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.UpdateReferredURL()
-	})
-}
-
 // SetSource sets the "source" field.
 func (u *PageSourceUpsertOne) SetSource(v string) *PageSourceUpsertOne {
 	return u.Update(func(s *PageSourceUpsert) {
@@ -521,7 +314,7 @@ func (u *PageSourceUpsertOne) ExecX(ctx context.Context) {
 }
 
 // Exec executes the UPSERT query and returns the inserted/updated ID.
-func (u *PageSourceUpsertOne) ID(ctx context.Context) (id string, err error) {
+func (u *PageSourceUpsertOne) ID(ctx context.Context) (id uuid.UUID, err error) {
 	if u.create.driver.Dialect() == dialect.MySQL {
 		// In case of "ON CONFLICT", there is no way to get back non-numeric ID
 		// fields from the database since MySQL does not support the RETURNING clause.
@@ -535,7 +328,7 @@ func (u *PageSourceUpsertOne) ID(ctx context.Context) (id string, err error) {
 }
 
 // IDX is like ID, but panics if an error occurs.
-func (u *PageSourceUpsertOne) IDX(ctx context.Context) string {
+func (u *PageSourceUpsertOne) IDX(ctx context.Context) uuid.UUID {
 	id, err := u.ID(ctx)
 	if err != nil {
 		panic(err)
@@ -637,7 +430,7 @@ func (pscb *PageSourceCreateBulk) ExecX(ctx context.Context) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.PageSourceUpsert) {
-//			SetPageID(v+v).
+//			SetSource(v+v).
 //		}).
 //		Exec(ctx)
 func (pscb *PageSourceCreateBulk) OnConflict(opts ...sql.ConflictOption) *PageSourceUpsertBulk {
@@ -714,62 +507,6 @@ func (u *PageSourceUpsertBulk) Update(set func(*PageSourceUpsert)) *PageSourceUp
 		set(&PageSourceUpsert{UpdateSet: update})
 	}))
 	return u
-}
-
-// SetPageID sets the "page_id" field.
-func (u *PageSourceUpsertBulk) SetPageID(v string) *PageSourceUpsertBulk {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.SetPageID(v)
-	})
-}
-
-// UpdatePageID sets the "page_id" field to the value that was provided on create.
-func (u *PageSourceUpsertBulk) UpdatePageID() *PageSourceUpsertBulk {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.UpdatePageID()
-	})
-}
-
-// SetReferredPageID sets the "referred_page_id" field.
-func (u *PageSourceUpsertBulk) SetReferredPageID(v string) *PageSourceUpsertBulk {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.SetReferredPageID(v)
-	})
-}
-
-// UpdateReferredPageID sets the "referred_page_id" field to the value that was provided on create.
-func (u *PageSourceUpsertBulk) UpdateReferredPageID() *PageSourceUpsertBulk {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.UpdateReferredPageID()
-	})
-}
-
-// SetURL sets the "url" field.
-func (u *PageSourceUpsertBulk) SetURL(v string) *PageSourceUpsertBulk {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.SetURL(v)
-	})
-}
-
-// UpdateURL sets the "url" field to the value that was provided on create.
-func (u *PageSourceUpsertBulk) UpdateURL() *PageSourceUpsertBulk {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.UpdateURL()
-	})
-}
-
-// SetReferredURL sets the "referred_url" field.
-func (u *PageSourceUpsertBulk) SetReferredURL(v string) *PageSourceUpsertBulk {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.SetReferredURL(v)
-	})
-}
-
-// UpdateReferredURL sets the "referred_url" field to the value that was provided on create.
-func (u *PageSourceUpsertBulk) UpdateReferredURL() *PageSourceUpsertBulk {
-	return u.Update(func(s *PageSourceUpsert) {
-		s.UpdateReferredURL()
-	})
 }
 
 // SetSource sets the "source" field.

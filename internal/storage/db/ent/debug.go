@@ -12,12 +12,12 @@ func (c *PageClient) Debug() *PageClient {
 	return &PageClient{config: cfg}
 }
 
-func (c *PageLinkClient) Debug() *PageLinkClient {
+func (c *PageReferredClient) Debug() *PageReferredClient {
 	if c.debug {
 		return c
 	}
 	cfg := config{driver: dialect.Debug(c.driver, c.log), log: c.log, debug: true, hooks: c.hooks}
-	return &PageLinkClient{config: cfg}
+	return &PageReferredClient{config: cfg}
 }
 
 func (c *PageSourceClient) Debug() *PageSourceClient {

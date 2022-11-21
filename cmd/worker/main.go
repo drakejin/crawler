@@ -24,10 +24,11 @@ func main() {
 	storageDB := storagedb.New(sql, true)
 	storageDB.Client()
 
-	c := crawler.New(storageDB.Client(), 10)
+	c := crawler.New(storageDB.Client(), 10, "20221121_2208")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c.Crawler(ctx, "", "https://gall.dcinside.com/board/view/?id=dcbest&no=92769")
+	c.Crawler(ctx, nil, "https://gall.dcinside.com/board/view/?id=dcbest&no=92769")
+	// c.Crawler(ctx, "", "https://www.hostinger.com/tutorials/uri-vs-url")
 }

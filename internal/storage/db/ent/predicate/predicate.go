@@ -9,8 +9,8 @@ import (
 // Page is the predicate function for page builders.
 type Page func(*sql.Selector)
 
-// PageLink is the predicate function for pagelink builders.
-type PageLink func(*sql.Selector)
+// PageReferred is the predicate function for pagereferred builders.
+type PageReferred func(*sql.Selector)
 
 // PageSource is the predicate function for pagesource builders.
 type PageSource func(*sql.Selector)

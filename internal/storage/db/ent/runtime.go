@@ -2,4 +2,217 @@
 
 package ent
 
-// The schema-stitching logic is generated in github.com/drakejin/crawler/internal/storage/db/ent/runtime/runtime.go
+import (
+	"time"
+
+	"github.com/drakejin/crawler/internal/storage/db/ent/page"
+	"github.com/drakejin/crawler/internal/storage/db/ent/pagereferred"
+	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
+	"github.com/drakejin/crawler/internal/storage/db/ent/schema"
+)
+
+// The init function reads all schema descriptors with runtime code
+// (default values, validators, hooks and policies) and stitches it
+// to their package variables.
+func init() {
+	pageFields := schema.Page{}.Fields()
+	_ = pageFields
+	// pageDescDomain is the schema descriptor for domain field.
+	pageDescDomain := pageFields[2].Descriptor()
+	// page.DomainValidator is a validator for the "domain" field. It is called by the builders before save.
+	page.DomainValidator = pageDescDomain.Validators[0].(func(string) error)
+	// pageDescPort is the schema descriptor for port field.
+	pageDescPort := pageFields[3].Descriptor()
+	// page.DefaultPort holds the default value on creation for the port field.
+	page.DefaultPort = pageDescPort.Default.(string)
+	// page.PortValidator is a validator for the "port" field. It is called by the builders before save.
+	page.PortValidator = pageDescPort.Validators[0].(func(string) error)
+	// pageDescIsHTTPS is the schema descriptor for is_https field.
+	pageDescIsHTTPS := pageFields[4].Descriptor()
+	// page.DefaultIsHTTPS holds the default value on creation for the is_https field.
+	page.DefaultIsHTTPS = pageDescIsHTTPS.Default.(bool)
+	// pageDescURL is the schema descriptor for url field.
+	pageDescURL := pageFields[5].Descriptor()
+	// page.URLValidator is a validator for the "url" field. It is called by the builders before save.
+	page.URLValidator = func() func(string) error {
+		validators := pageDescURL.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(url string) error {
+			for _, fn := range fns {
+				if err := fn(url); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// pageDescPath is the schema descriptor for path field.
+	pageDescPath := pageFields[6].Descriptor()
+	// page.DefaultPath holds the default value on creation for the path field.
+	page.DefaultPath = pageDescPath.Default.(string)
+	// page.PathValidator is a validator for the "path" field. It is called by the builders before save.
+	page.PathValidator = pageDescPath.Validators[0].(func(string) error)
+	// pageDescQuerystring is the schema descriptor for querystring field.
+	pageDescQuerystring := pageFields[7].Descriptor()
+	// page.DefaultQuerystring holds the default value on creation for the querystring field.
+	page.DefaultQuerystring = pageDescQuerystring.Default.(string)
+	// pageDescCountReferred is the schema descriptor for count_referred field.
+	pageDescCountReferred := pageFields[8].Descriptor()
+	// page.DefaultCountReferred holds the default value on creation for the count_referred field.
+	page.DefaultCountReferred = pageDescCountReferred.Default.(int64)
+	// pageDescCreatedAt is the schema descriptor for created_at field.
+	pageDescCreatedAt := pageFields[10].Descriptor()
+	// page.DefaultCreatedAt holds the default value on creation for the created_at field.
+	page.DefaultCreatedAt = pageDescCreatedAt.Default.(func() time.Time)
+	// pageDescCreatedBy is the schema descriptor for created_by field.
+	pageDescCreatedBy := pageFields[11].Descriptor()
+	// page.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
+	page.CreatedByValidator = pageDescCreatedBy.Validators[0].(func(string) error)
+	// pageDescUpdatedAt is the schema descriptor for updated_at field.
+	pageDescUpdatedAt := pageFields[12].Descriptor()
+	// page.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	page.DefaultUpdatedAt = pageDescUpdatedAt.Default.(func() time.Time)
+	// page.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	page.UpdateDefaultUpdatedAt = pageDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// pageDescUpdatedBy is the schema descriptor for updated_by field.
+	pageDescUpdatedBy := pageFields[13].Descriptor()
+	// page.UpdatedByValidator is a validator for the "updated_by" field. It is called by the builders before save.
+	page.UpdatedByValidator = pageDescUpdatedBy.Validators[0].(func(string) error)
+	// pageDescTitle is the schema descriptor for title field.
+	pageDescTitle := pageFields[14].Descriptor()
+	// page.DefaultTitle holds the default value on creation for the title field.
+	page.DefaultTitle = pageDescTitle.Default.(string)
+	// pageDescDescription is the schema descriptor for description field.
+	pageDescDescription := pageFields[15].Descriptor()
+	// page.DefaultDescription holds the default value on creation for the description field.
+	page.DefaultDescription = pageDescDescription.Default.(string)
+	// pageDescKeywords is the schema descriptor for keywords field.
+	pageDescKeywords := pageFields[16].Descriptor()
+	// page.DefaultKeywords holds the default value on creation for the keywords field.
+	page.DefaultKeywords = pageDescKeywords.Default.(string)
+	// pageDescContentLanguage is the schema descriptor for content_language field.
+	pageDescContentLanguage := pageFields[17].Descriptor()
+	// page.DefaultContentLanguage holds the default value on creation for the content_language field.
+	page.DefaultContentLanguage = pageDescContentLanguage.Default.(string)
+	// pageDescTwitterCard is the schema descriptor for twitter_card field.
+	pageDescTwitterCard := pageFields[18].Descriptor()
+	// page.DefaultTwitterCard holds the default value on creation for the twitter_card field.
+	page.DefaultTwitterCard = pageDescTwitterCard.Default.(string)
+	// pageDescTwitterURL is the schema descriptor for twitter_url field.
+	pageDescTwitterURL := pageFields[19].Descriptor()
+	// page.DefaultTwitterURL holds the default value on creation for the twitter_url field.
+	page.DefaultTwitterURL = pageDescTwitterURL.Default.(string)
+	// pageDescTwitterTitle is the schema descriptor for twitter_title field.
+	pageDescTwitterTitle := pageFields[20].Descriptor()
+	// page.DefaultTwitterTitle holds the default value on creation for the twitter_title field.
+	page.DefaultTwitterTitle = pageDescTwitterTitle.Default.(string)
+	// pageDescTwitterDescription is the schema descriptor for twitter_description field.
+	pageDescTwitterDescription := pageFields[21].Descriptor()
+	// page.DefaultTwitterDescription holds the default value on creation for the twitter_description field.
+	page.DefaultTwitterDescription = pageDescTwitterDescription.Default.(string)
+	// pageDescTwitterImage is the schema descriptor for twitter_image field.
+	pageDescTwitterImage := pageFields[22].Descriptor()
+	// page.DefaultTwitterImage holds the default value on creation for the twitter_image field.
+	page.DefaultTwitterImage = pageDescTwitterImage.Default.(string)
+	// pageDescOgSiteName is the schema descriptor for og_site_name field.
+	pageDescOgSiteName := pageFields[23].Descriptor()
+	// page.DefaultOgSiteName holds the default value on creation for the og_site_name field.
+	page.DefaultOgSiteName = pageDescOgSiteName.Default.(string)
+	// pageDescOgLocale is the schema descriptor for og_locale field.
+	pageDescOgLocale := pageFields[24].Descriptor()
+	// page.DefaultOgLocale holds the default value on creation for the og_locale field.
+	page.DefaultOgLocale = pageDescOgLocale.Default.(string)
+	// pageDescOgTitle is the schema descriptor for og_title field.
+	pageDescOgTitle := pageFields[25].Descriptor()
+	// page.DefaultOgTitle holds the default value on creation for the og_title field.
+	page.DefaultOgTitle = pageDescOgTitle.Default.(string)
+	// pageDescOgDescription is the schema descriptor for og_description field.
+	pageDescOgDescription := pageFields[26].Descriptor()
+	// page.DefaultOgDescription holds the default value on creation for the og_description field.
+	page.DefaultOgDescription = pageDescOgDescription.Default.(string)
+	// pageDescOgType is the schema descriptor for og_type field.
+	pageDescOgType := pageFields[27].Descriptor()
+	// page.DefaultOgType holds the default value on creation for the og_type field.
+	page.DefaultOgType = pageDescOgType.Default.(string)
+	// pageDescOgURL is the schema descriptor for og_url field.
+	pageDescOgURL := pageFields[28].Descriptor()
+	// page.DefaultOgURL holds the default value on creation for the og_url field.
+	page.DefaultOgURL = pageDescOgURL.Default.(string)
+	// pageDescOgImage is the schema descriptor for og_image field.
+	pageDescOgImage := pageFields[29].Descriptor()
+	// page.DefaultOgImage holds the default value on creation for the og_image field.
+	page.DefaultOgImage = pageDescOgImage.Default.(string)
+	// pageDescOgImageType is the schema descriptor for og_image_type field.
+	pageDescOgImageType := pageFields[30].Descriptor()
+	// page.DefaultOgImageType holds the default value on creation for the og_image_type field.
+	page.DefaultOgImageType = pageDescOgImageType.Default.(string)
+	// pageDescOgImageURL is the schema descriptor for og_image_url field.
+	pageDescOgImageURL := pageFields[31].Descriptor()
+	// page.DefaultOgImageURL holds the default value on creation for the og_image_url field.
+	page.DefaultOgImageURL = pageDescOgImageURL.Default.(string)
+	// pageDescOgImageSecureURL is the schema descriptor for og_image_secure_url field.
+	pageDescOgImageSecureURL := pageFields[32].Descriptor()
+	// page.DefaultOgImageSecureURL holds the default value on creation for the og_image_secure_url field.
+	page.DefaultOgImageSecureURL = pageDescOgImageSecureURL.Default.(string)
+	// pageDescOgImageWidth is the schema descriptor for og_image_width field.
+	pageDescOgImageWidth := pageFields[33].Descriptor()
+	// page.DefaultOgImageWidth holds the default value on creation for the og_image_width field.
+	page.DefaultOgImageWidth = pageDescOgImageWidth.Default.(string)
+	// pageDescOgImageHeight is the schema descriptor for og_image_height field.
+	pageDescOgImageHeight := pageFields[34].Descriptor()
+	// page.DefaultOgImageHeight holds the default value on creation for the og_image_height field.
+	page.DefaultOgImageHeight = pageDescOgImageHeight.Default.(string)
+	// pageDescOgVideo is the schema descriptor for og_video field.
+	pageDescOgVideo := pageFields[35].Descriptor()
+	// page.DefaultOgVideo holds the default value on creation for the og_video field.
+	page.DefaultOgVideo = pageDescOgVideo.Default.(string)
+	// pageDescOgVideoType is the schema descriptor for og_video_type field.
+	pageDescOgVideoType := pageFields[36].Descriptor()
+	// page.DefaultOgVideoType holds the default value on creation for the og_video_type field.
+	page.DefaultOgVideoType = pageDescOgVideoType.Default.(string)
+	// pageDescOgVideoURL is the schema descriptor for og_video_url field.
+	pageDescOgVideoURL := pageFields[37].Descriptor()
+	// page.DefaultOgVideoURL holds the default value on creation for the og_video_url field.
+	page.DefaultOgVideoURL = pageDescOgVideoURL.Default.(string)
+	// pageDescOgVideoSecureURL is the schema descriptor for og_video_secure_url field.
+	pageDescOgVideoSecureURL := pageFields[38].Descriptor()
+	// page.DefaultOgVideoSecureURL holds the default value on creation for the og_video_secure_url field.
+	page.DefaultOgVideoSecureURL = pageDescOgVideoSecureURL.Default.(string)
+	// pageDescOgVideoWidth is the schema descriptor for og_video_width field.
+	pageDescOgVideoWidth := pageFields[39].Descriptor()
+	// page.DefaultOgVideoWidth holds the default value on creation for the og_video_width field.
+	page.DefaultOgVideoWidth = pageDescOgVideoWidth.Default.(string)
+	// pageDescOgVideoHeight is the schema descriptor for og_video_height field.
+	pageDescOgVideoHeight := pageFields[40].Descriptor()
+	// page.DefaultOgVideoHeight holds the default value on creation for the og_video_height field.
+	page.DefaultOgVideoHeight = pageDescOgVideoHeight.Default.(string)
+	pagereferredFields := schema.PageReferred{}.Fields()
+	_ = pagereferredFields
+	// pagereferredDescCreatedAt is the schema descriptor for created_at field.
+	pagereferredDescCreatedAt := pagereferredFields[3].Descriptor()
+	// pagereferred.DefaultCreatedAt holds the default value on creation for the created_at field.
+	pagereferred.DefaultCreatedAt = pagereferredDescCreatedAt.Default.(func() time.Time)
+	// pagereferredDescCreatedBy is the schema descriptor for created_by field.
+	pagereferredDescCreatedBy := pagereferredFields[4].Descriptor()
+	// pagereferred.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
+	pagereferred.CreatedByValidator = pagereferredDescCreatedBy.Validators[0].(func(string) error)
+	// pagereferredDescUpdatedAt is the schema descriptor for updated_at field.
+	pagereferredDescUpdatedAt := pagereferredFields[5].Descriptor()
+	// pagereferred.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	pagereferred.DefaultUpdatedAt = pagereferredDescUpdatedAt.Default.(func() time.Time)
+	// pagereferred.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	pagereferred.UpdateDefaultUpdatedAt = pagereferredDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// pagereferredDescUpdatedBy is the schema descriptor for updated_by field.
+	pagereferredDescUpdatedBy := pagereferredFields[6].Descriptor()
+	// pagereferred.UpdatedByValidator is a validator for the "updated_by" field. It is called by the builders before save.
+	pagereferred.UpdatedByValidator = pagereferredDescUpdatedBy.Validators[0].(func(string) error)
+	pagesourceFields := schema.PageSource{}.Fields()
+	_ = pagesourceFields
+	// pagesourceDescSource is the schema descriptor for source field.
+	pagesourceDescSource := pagesourceFields[1].Descriptor()
+	// pagesource.DefaultSource holds the default value on creation for the source field.
+	pagesource.DefaultSource = pagesourceDescSource.Default.(string)
+}

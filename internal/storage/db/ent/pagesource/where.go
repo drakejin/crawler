@@ -4,33 +4,33 @@ package pagesource
 
 import (
 	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/drakejin/crawler/internal/storage/db/ent/predicate"
+	"github.com/google/uuid"
 )
 
 // ID filters vertices based on their ID field.
-func ID(id string) predicate.PageSource {
+func ID(id uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldID), id))
 	})
 }
 
 // IDEQ applies the EQ predicate on the ID field.
-func IDEQ(id string) predicate.PageSource {
+func IDEQ(id uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldID), id))
 	})
 }
 
 // IDNEQ applies the NEQ predicate on the ID field.
-func IDNEQ(id string) predicate.PageSource {
+func IDNEQ(id uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.NEQ(s.C(FieldID), id))
 	})
 }
 
 // IDIn applies the In predicate on the ID field.
-func IDIn(ids ...string) predicate.PageSource {
+func IDIn(ids ...uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		v := make([]any, len(ids))
 		for i := range v {
@@ -41,7 +41,7 @@ func IDIn(ids ...string) predicate.PageSource {
 }
 
 // IDNotIn applies the NotIn predicate on the ID field.
-func IDNotIn(ids ...string) predicate.PageSource {
+func IDNotIn(ids ...uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		v := make([]any, len(ids))
 		for i := range v {
@@ -52,58 +52,30 @@ func IDNotIn(ids ...string) predicate.PageSource {
 }
 
 // IDGT applies the GT predicate on the ID field.
-func IDGT(id string) predicate.PageSource {
+func IDGT(id uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.GT(s.C(FieldID), id))
 	})
 }
 
 // IDGTE applies the GTE predicate on the ID field.
-func IDGTE(id string) predicate.PageSource {
+func IDGTE(id uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.GTE(s.C(FieldID), id))
 	})
 }
 
 // IDLT applies the LT predicate on the ID field.
-func IDLT(id string) predicate.PageSource {
+func IDLT(id uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.LT(s.C(FieldID), id))
 	})
 }
 
 // IDLTE applies the LTE predicate on the ID field.
-func IDLTE(id string) predicate.PageSource {
+func IDLTE(id uuid.UUID) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.LTE(s.C(FieldID), id))
-	})
-}
-
-// PageID applies equality check predicate on the "page_id" field. It's identical to PageIDEQ.
-func PageID(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldPageID), v))
-	})
-}
-
-// ReferredPageID applies equality check predicate on the "referred_page_id" field. It's identical to ReferredPageIDEQ.
-func ReferredPageID(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldReferredPageID), v))
-	})
-}
-
-// URL applies equality check predicate on the "url" field. It's identical to URLEQ.
-func URL(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldURL), v))
-	})
-}
-
-// ReferredURL applies equality check predicate on the "referred_url" field. It's identical to ReferredURLEQ.
-func ReferredURL(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldReferredURL), v))
 	})
 }
 
@@ -111,402 +83,6 @@ func ReferredURL(v string) predicate.PageSource {
 func Source(v string) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldSource), v))
-	})
-}
-
-// PageIDEQ applies the EQ predicate on the "page_id" field.
-func PageIDEQ(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDNEQ applies the NEQ predicate on the "page_id" field.
-func PageIDNEQ(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.NEQ(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDIn applies the In predicate on the "page_id" field.
-func PageIDIn(vs ...string) predicate.PageSource {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.In(s.C(FieldPageID), v...))
-	})
-}
-
-// PageIDNotIn applies the NotIn predicate on the "page_id" field.
-func PageIDNotIn(vs ...string) predicate.PageSource {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.NotIn(s.C(FieldPageID), v...))
-	})
-}
-
-// PageIDGT applies the GT predicate on the "page_id" field.
-func PageIDGT(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.GT(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDGTE applies the GTE predicate on the "page_id" field.
-func PageIDGTE(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.GTE(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDLT applies the LT predicate on the "page_id" field.
-func PageIDLT(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.LT(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDLTE applies the LTE predicate on the "page_id" field.
-func PageIDLTE(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.LTE(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDContains applies the Contains predicate on the "page_id" field.
-func PageIDContains(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.Contains(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDHasPrefix applies the HasPrefix predicate on the "page_id" field.
-func PageIDHasPrefix(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.HasPrefix(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDHasSuffix applies the HasSuffix predicate on the "page_id" field.
-func PageIDHasSuffix(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.HasSuffix(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDEqualFold applies the EqualFold predicate on the "page_id" field.
-func PageIDEqualFold(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EqualFold(s.C(FieldPageID), v))
-	})
-}
-
-// PageIDContainsFold applies the ContainsFold predicate on the "page_id" field.
-func PageIDContainsFold(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.ContainsFold(s.C(FieldPageID), v))
-	})
-}
-
-// ReferredPageIDEQ applies the EQ predicate on the "referred_page_id" field.
-func ReferredPageIDEQ(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDNEQ applies the NEQ predicate on the "referred_page_id" field.
-func ReferredPageIDNEQ(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.NEQ(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDIn applies the In predicate on the "referred_page_id" field.
-func ReferredPageIDIn(vs ...string) predicate.PageSource {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.In(s.C(FieldReferredPageID), v...))
-	})
-}
-
-// ReferredPageIDNotIn applies the NotIn predicate on the "referred_page_id" field.
-func ReferredPageIDNotIn(vs ...string) predicate.PageSource {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.NotIn(s.C(FieldReferredPageID), v...))
-	})
-}
-
-// ReferredPageIDGT applies the GT predicate on the "referred_page_id" field.
-func ReferredPageIDGT(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.GT(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDGTE applies the GTE predicate on the "referred_page_id" field.
-func ReferredPageIDGTE(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.GTE(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDLT applies the LT predicate on the "referred_page_id" field.
-func ReferredPageIDLT(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.LT(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDLTE applies the LTE predicate on the "referred_page_id" field.
-func ReferredPageIDLTE(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.LTE(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDContains applies the Contains predicate on the "referred_page_id" field.
-func ReferredPageIDContains(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.Contains(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDHasPrefix applies the HasPrefix predicate on the "referred_page_id" field.
-func ReferredPageIDHasPrefix(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.HasPrefix(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDHasSuffix applies the HasSuffix predicate on the "referred_page_id" field.
-func ReferredPageIDHasSuffix(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.HasSuffix(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDEqualFold applies the EqualFold predicate on the "referred_page_id" field.
-func ReferredPageIDEqualFold(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EqualFold(s.C(FieldReferredPageID), v))
-	})
-}
-
-// ReferredPageIDContainsFold applies the ContainsFold predicate on the "referred_page_id" field.
-func ReferredPageIDContainsFold(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.ContainsFold(s.C(FieldReferredPageID), v))
-	})
-}
-
-// URLEQ applies the EQ predicate on the "url" field.
-func URLEQ(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldURL), v))
-	})
-}
-
-// URLNEQ applies the NEQ predicate on the "url" field.
-func URLNEQ(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.NEQ(s.C(FieldURL), v))
-	})
-}
-
-// URLIn applies the In predicate on the "url" field.
-func URLIn(vs ...string) predicate.PageSource {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.In(s.C(FieldURL), v...))
-	})
-}
-
-// URLNotIn applies the NotIn predicate on the "url" field.
-func URLNotIn(vs ...string) predicate.PageSource {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.NotIn(s.C(FieldURL), v...))
-	})
-}
-
-// URLGT applies the GT predicate on the "url" field.
-func URLGT(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.GT(s.C(FieldURL), v))
-	})
-}
-
-// URLGTE applies the GTE predicate on the "url" field.
-func URLGTE(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.GTE(s.C(FieldURL), v))
-	})
-}
-
-// URLLT applies the LT predicate on the "url" field.
-func URLLT(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.LT(s.C(FieldURL), v))
-	})
-}
-
-// URLLTE applies the LTE predicate on the "url" field.
-func URLLTE(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.LTE(s.C(FieldURL), v))
-	})
-}
-
-// URLContains applies the Contains predicate on the "url" field.
-func URLContains(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.Contains(s.C(FieldURL), v))
-	})
-}
-
-// URLHasPrefix applies the HasPrefix predicate on the "url" field.
-func URLHasPrefix(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.HasPrefix(s.C(FieldURL), v))
-	})
-}
-
-// URLHasSuffix applies the HasSuffix predicate on the "url" field.
-func URLHasSuffix(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.HasSuffix(s.C(FieldURL), v))
-	})
-}
-
-// URLEqualFold applies the EqualFold predicate on the "url" field.
-func URLEqualFold(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EqualFold(s.C(FieldURL), v))
-	})
-}
-
-// URLContainsFold applies the ContainsFold predicate on the "url" field.
-func URLContainsFold(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.ContainsFold(s.C(FieldURL), v))
-	})
-}
-
-// ReferredURLEQ applies the EQ predicate on the "referred_url" field.
-func ReferredURLEQ(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLNEQ applies the NEQ predicate on the "referred_url" field.
-func ReferredURLNEQ(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.NEQ(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLIn applies the In predicate on the "referred_url" field.
-func ReferredURLIn(vs ...string) predicate.PageSource {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.In(s.C(FieldReferredURL), v...))
-	})
-}
-
-// ReferredURLNotIn applies the NotIn predicate on the "referred_url" field.
-func ReferredURLNotIn(vs ...string) predicate.PageSource {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.NotIn(s.C(FieldReferredURL), v...))
-	})
-}
-
-// ReferredURLGT applies the GT predicate on the "referred_url" field.
-func ReferredURLGT(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.GT(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLGTE applies the GTE predicate on the "referred_url" field.
-func ReferredURLGTE(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.GTE(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLLT applies the LT predicate on the "referred_url" field.
-func ReferredURLLT(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.LT(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLLTE applies the LTE predicate on the "referred_url" field.
-func ReferredURLLTE(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.LTE(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLContains applies the Contains predicate on the "referred_url" field.
-func ReferredURLContains(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.Contains(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLHasPrefix applies the HasPrefix predicate on the "referred_url" field.
-func ReferredURLHasPrefix(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.HasPrefix(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLHasSuffix applies the HasSuffix predicate on the "referred_url" field.
-func ReferredURLHasSuffix(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.HasSuffix(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLEqualFold applies the EqualFold predicate on the "referred_url" field.
-func ReferredURLEqualFold(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.EqualFold(s.C(FieldReferredURL), v))
-	})
-}
-
-// ReferredURLContainsFold applies the ContainsFold predicate on the "referred_url" field.
-func ReferredURLContainsFold(v string) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		s.Where(sql.ContainsFold(s.C(FieldReferredURL), v))
 	})
 }
 
@@ -606,34 +182,6 @@ func SourceEqualFold(v string) predicate.PageSource {
 func SourceContainsFold(v string) predicate.PageSource {
 	return predicate.PageSource(func(s *sql.Selector) {
 		s.Where(sql.ContainsFold(s.C(FieldSource), v))
-	})
-}
-
-// HasPage applies the HasEdge predicate on the "page" edge.
-func HasPage() predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.To(PageTable, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, PageTable, PageColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasPageWith applies the HasEdge predicate on the "page" edge with a given conditions (other predicates).
-func HasPageWith(preds ...predicate.Page) predicate.PageSource {
-	return predicate.PageSource(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.To(PageInverseTable, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, PageTable, PageColumn),
-		)
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
 	})
 }
 

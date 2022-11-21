@@ -11,7 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/drakejin/crawler/internal/storage/db/ent/page"
-	"github.com/drakejin/crawler/internal/storage/db/ent/pagelink"
+	"github.com/drakejin/crawler/internal/storage/db/ent/pagereferred"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 )
 
@@ -33,9 +33,9 @@ type OrderFunc func(*sql.Selector)
 // columnChecker returns a function indicates if the column exists in the given column.
 func columnChecker(table string) func(string) error {
 	checks := map[string]func(string) bool{
-		page.Table:       page.ValidColumn,
-		pagelink.Table:   pagelink.ValidColumn,
-		pagesource.Table: pagesource.ValidColumn,
+		page.Table:         page.ValidColumn,
+		pagereferred.Table: pagereferred.ValidColumn,
+		pagesource.Table:   pagesource.ValidColumn,
 	}
 	check, ok := checks[table]
 	if !ok {

@@ -14,6 +14,7 @@ import (
 	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 	"github.com/drakejin/crawler/internal/storage/db/ent/predicate"
+	"github.com/google/uuid"
 )
 
 // PageUpdate is the builder for updating Page entities.
@@ -26,12 +27,6 @@ type PageUpdate struct {
 // Where appends a list predicates to the PageUpdate builder.
 func (pu *PageUpdate) Where(ps ...predicate.Page) *PageUpdate {
 	pu.mutation.Where(ps...)
-	return pu
-}
-
-// SetReferredID sets the "referred_id" field.
-func (pu *PageUpdate) SetReferredID(s string) *PageUpdate {
-	pu.mutation.SetReferredID(s)
 	return pu
 }
 
@@ -75,17 +70,9 @@ func (pu *PageUpdate) SetNillableIsHTTPS(b *bool) *PageUpdate {
 	return pu
 }
 
-// SetIndexedURL sets the "indexed_url" field.
-func (pu *PageUpdate) SetIndexedURL(s string) *PageUpdate {
-	pu.mutation.SetIndexedURL(s)
-	return pu
-}
-
-// SetNillableIndexedURL sets the "indexed_url" field if the given value is not nil.
-func (pu *PageUpdate) SetNillableIndexedURL(s *string) *PageUpdate {
-	if s != nil {
-		pu.SetIndexedURL(*s)
-	}
+// SetURL sets the "url" field.
+func (pu *PageUpdate) SetURL(s string) *PageUpdate {
+	pu.mutation.SetURL(s)
 	return pu
 }
 
@@ -113,20 +100,6 @@ func (pu *PageUpdate) SetQuerystring(s string) *PageUpdate {
 func (pu *PageUpdate) SetNillableQuerystring(s *string) *PageUpdate {
 	if s != nil {
 		pu.SetQuerystring(*s)
-	}
-	return pu
-}
-
-// SetURL sets the "url" field.
-func (pu *PageUpdate) SetURL(s string) *PageUpdate {
-	pu.mutation.SetURL(s)
-	return pu
-}
-
-// SetNillableURL sets the "url" field if the given value is not nil.
-func (pu *PageUpdate) SetNillableURL(s *string) *PageUpdate {
-	if s != nil {
-		pu.SetURL(*s)
 	}
 	return pu
 }
@@ -563,14 +536,14 @@ func (pu *PageUpdate) SetNillableOgVideoHeight(s *string) *PageUpdate {
 }
 
 // AddPageSourceIDs adds the "page_source" edge to the PageSource entity by IDs.
-func (pu *PageUpdate) AddPageSourceIDs(ids ...string) *PageUpdate {
+func (pu *PageUpdate) AddPageSourceIDs(ids ...uuid.UUID) *PageUpdate {
 	pu.mutation.AddPageSourceIDs(ids...)
 	return pu
 }
 
 // AddPageSource adds the "page_source" edges to the PageSource entity.
 func (pu *PageUpdate) AddPageSource(p ...*PageSource) *PageUpdate {
-	ids := make([]string, len(p))
+	ids := make([]uuid.UUID, len(p))
 	for i := range p {
 		ids[i] = p[i].ID
 	}
@@ -589,14 +562,14 @@ func (pu *PageUpdate) ClearPageSource() *PageUpdate {
 }
 
 // RemovePageSourceIDs removes the "page_source" edge to PageSource entities by IDs.
-func (pu *PageUpdate) RemovePageSourceIDs(ids ...string) *PageUpdate {
+func (pu *PageUpdate) RemovePageSourceIDs(ids ...uuid.UUID) *PageUpdate {
 	pu.mutation.RemovePageSourceIDs(ids...)
 	return pu
 }
 
 // RemovePageSource removes "page_source" edges to PageSource entities.
 func (pu *PageUpdate) RemovePageSource(p ...*PageSource) *PageUpdate {
-	ids := make([]string, len(p))
+	ids := make([]uuid.UUID, len(p))
 	for i := range p {
 		ids[i] = p[i].ID
 	}
@@ -609,9 +582,7 @@ func (pu *PageUpdate) Save(ctx context.Context) (int, error) {
 		err      error
 		affected int
 	)
-	if err := pu.defaults(); err != nil {
-		return 0, err
-	}
+	pu.defaults()
 	if len(pu.hooks) == 0 {
 		if err = pu.check(); err != nil {
 			return 0, err
@@ -667,15 +638,11 @@ func (pu *PageUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (pu *PageUpdate) defaults() error {
+func (pu *PageUpdate) defaults() {
 	if _, ok := pu.mutation.UpdatedAt(); !ok {
-		if page.UpdateDefaultUpdatedAt == nil {
-			return fmt.Errorf("ent: uninitialized page.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
-		}
 		v := page.UpdateDefaultUpdatedAt()
 		pu.mutation.SetUpdatedAt(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -690,9 +657,9 @@ func (pu *PageUpdate) check() error {
 			return &ValidationError{Name: "port", err: fmt.Errorf(`ent: validator failed for field "Page.port": %w`, err)}
 		}
 	}
-	if v, ok := pu.mutation.IndexedURL(); ok {
-		if err := page.IndexedURLValidator(v); err != nil {
-			return &ValidationError{Name: "indexed_url", err: fmt.Errorf(`ent: validator failed for field "Page.indexed_url": %w`, err)}
+	if v, ok := pu.mutation.URL(); ok {
+		if err := page.URLValidator(v); err != nil {
+			return &ValidationError{Name: "url", err: fmt.Errorf(`ent: validator failed for field "Page.url": %w`, err)}
 		}
 	}
 	if v, ok := pu.mutation.Path(); ok {
@@ -724,7 +691,7 @@ func (pu *PageUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Table:   page.Table,
 			Columns: page.Columns,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: page.FieldID,
 			},
 		},
@@ -735,9 +702,6 @@ func (pu *PageUpdate) sqlSave(ctx context.Context) (n int, err error) {
 				ps[i](selector)
 			}
 		}
-	}
-	if value, ok := pu.mutation.ReferredID(); ok {
-		_spec.SetField(page.FieldReferredID, field.TypeString, value)
 	}
 	if value, ok := pu.mutation.CrawlingVersion(); ok {
 		_spec.SetField(page.FieldCrawlingVersion, field.TypeString, value)
@@ -751,17 +715,14 @@ func (pu *PageUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := pu.mutation.IsHTTPS(); ok {
 		_spec.SetField(page.FieldIsHTTPS, field.TypeBool, value)
 	}
-	if value, ok := pu.mutation.IndexedURL(); ok {
-		_spec.SetField(page.FieldIndexedURL, field.TypeString, value)
+	if value, ok := pu.mutation.URL(); ok {
+		_spec.SetField(page.FieldURL, field.TypeString, value)
 	}
 	if value, ok := pu.mutation.Path(); ok {
 		_spec.SetField(page.FieldPath, field.TypeString, value)
 	}
 	if value, ok := pu.mutation.Querystring(); ok {
 		_spec.SetField(page.FieldQuerystring, field.TypeString, value)
-	}
-	if value, ok := pu.mutation.URL(); ok {
-		_spec.SetField(page.FieldURL, field.TypeString, value)
 	}
 	if value, ok := pu.mutation.CountReferred(); ok {
 		_spec.SetField(page.FieldCountReferred, field.TypeInt64, value)
@@ -871,7 +832,7 @@ func (pu *PageUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
+					Type:   field.TypeUUID,
 					Column: pagesource.FieldID,
 				},
 			},
@@ -887,7 +848,7 @@ func (pu *PageUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
+					Type:   field.TypeUUID,
 					Column: pagesource.FieldID,
 				},
 			},
@@ -906,7 +867,7 @@ func (pu *PageUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
+					Type:   field.TypeUUID,
 					Column: pagesource.FieldID,
 				},
 			},
@@ -933,12 +894,6 @@ type PageUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *PageMutation
-}
-
-// SetReferredID sets the "referred_id" field.
-func (puo *PageUpdateOne) SetReferredID(s string) *PageUpdateOne {
-	puo.mutation.SetReferredID(s)
-	return puo
 }
 
 // SetCrawlingVersion sets the "crawling_version" field.
@@ -981,17 +936,9 @@ func (puo *PageUpdateOne) SetNillableIsHTTPS(b *bool) *PageUpdateOne {
 	return puo
 }
 
-// SetIndexedURL sets the "indexed_url" field.
-func (puo *PageUpdateOne) SetIndexedURL(s string) *PageUpdateOne {
-	puo.mutation.SetIndexedURL(s)
-	return puo
-}
-
-// SetNillableIndexedURL sets the "indexed_url" field if the given value is not nil.
-func (puo *PageUpdateOne) SetNillableIndexedURL(s *string) *PageUpdateOne {
-	if s != nil {
-		puo.SetIndexedURL(*s)
-	}
+// SetURL sets the "url" field.
+func (puo *PageUpdateOne) SetURL(s string) *PageUpdateOne {
+	puo.mutation.SetURL(s)
 	return puo
 }
 
@@ -1019,20 +966,6 @@ func (puo *PageUpdateOne) SetQuerystring(s string) *PageUpdateOne {
 func (puo *PageUpdateOne) SetNillableQuerystring(s *string) *PageUpdateOne {
 	if s != nil {
 		puo.SetQuerystring(*s)
-	}
-	return puo
-}
-
-// SetURL sets the "url" field.
-func (puo *PageUpdateOne) SetURL(s string) *PageUpdateOne {
-	puo.mutation.SetURL(s)
-	return puo
-}
-
-// SetNillableURL sets the "url" field if the given value is not nil.
-func (puo *PageUpdateOne) SetNillableURL(s *string) *PageUpdateOne {
-	if s != nil {
-		puo.SetURL(*s)
 	}
 	return puo
 }
@@ -1469,14 +1402,14 @@ func (puo *PageUpdateOne) SetNillableOgVideoHeight(s *string) *PageUpdateOne {
 }
 
 // AddPageSourceIDs adds the "page_source" edge to the PageSource entity by IDs.
-func (puo *PageUpdateOne) AddPageSourceIDs(ids ...string) *PageUpdateOne {
+func (puo *PageUpdateOne) AddPageSourceIDs(ids ...uuid.UUID) *PageUpdateOne {
 	puo.mutation.AddPageSourceIDs(ids...)
 	return puo
 }
 
 // AddPageSource adds the "page_source" edges to the PageSource entity.
 func (puo *PageUpdateOne) AddPageSource(p ...*PageSource) *PageUpdateOne {
-	ids := make([]string, len(p))
+	ids := make([]uuid.UUID, len(p))
 	for i := range p {
 		ids[i] = p[i].ID
 	}
@@ -1495,14 +1428,14 @@ func (puo *PageUpdateOne) ClearPageSource() *PageUpdateOne {
 }
 
 // RemovePageSourceIDs removes the "page_source" edge to PageSource entities by IDs.
-func (puo *PageUpdateOne) RemovePageSourceIDs(ids ...string) *PageUpdateOne {
+func (puo *PageUpdateOne) RemovePageSourceIDs(ids ...uuid.UUID) *PageUpdateOne {
 	puo.mutation.RemovePageSourceIDs(ids...)
 	return puo
 }
 
 // RemovePageSource removes "page_source" edges to PageSource entities.
 func (puo *PageUpdateOne) RemovePageSource(p ...*PageSource) *PageUpdateOne {
-	ids := make([]string, len(p))
+	ids := make([]uuid.UUID, len(p))
 	for i := range p {
 		ids[i] = p[i].ID
 	}
@@ -1522,9 +1455,7 @@ func (puo *PageUpdateOne) Save(ctx context.Context) (*Page, error) {
 		err  error
 		node *Page
 	)
-	if err := puo.defaults(); err != nil {
-		return nil, err
-	}
+	puo.defaults()
 	if len(puo.hooks) == 0 {
 		if err = puo.check(); err != nil {
 			return nil, err
@@ -1586,15 +1517,11 @@ func (puo *PageUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (puo *PageUpdateOne) defaults() error {
+func (puo *PageUpdateOne) defaults() {
 	if _, ok := puo.mutation.UpdatedAt(); !ok {
-		if page.UpdateDefaultUpdatedAt == nil {
-			return fmt.Errorf("ent: uninitialized page.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
-		}
 		v := page.UpdateDefaultUpdatedAt()
 		puo.mutation.SetUpdatedAt(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -1609,9 +1536,9 @@ func (puo *PageUpdateOne) check() error {
 			return &ValidationError{Name: "port", err: fmt.Errorf(`ent: validator failed for field "Page.port": %w`, err)}
 		}
 	}
-	if v, ok := puo.mutation.IndexedURL(); ok {
-		if err := page.IndexedURLValidator(v); err != nil {
-			return &ValidationError{Name: "indexed_url", err: fmt.Errorf(`ent: validator failed for field "Page.indexed_url": %w`, err)}
+	if v, ok := puo.mutation.URL(); ok {
+		if err := page.URLValidator(v); err != nil {
+			return &ValidationError{Name: "url", err: fmt.Errorf(`ent: validator failed for field "Page.url": %w`, err)}
 		}
 	}
 	if v, ok := puo.mutation.Path(); ok {
@@ -1643,7 +1570,7 @@ func (puo *PageUpdateOne) sqlSave(ctx context.Context) (_node *Page, err error) 
 			Table:   page.Table,
 			Columns: page.Columns,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: page.FieldID,
 			},
 		},
@@ -1672,9 +1599,6 @@ func (puo *PageUpdateOne) sqlSave(ctx context.Context) (_node *Page, err error) 
 			}
 		}
 	}
-	if value, ok := puo.mutation.ReferredID(); ok {
-		_spec.SetField(page.FieldReferredID, field.TypeString, value)
-	}
 	if value, ok := puo.mutation.CrawlingVersion(); ok {
 		_spec.SetField(page.FieldCrawlingVersion, field.TypeString, value)
 	}
@@ -1687,17 +1611,14 @@ func (puo *PageUpdateOne) sqlSave(ctx context.Context) (_node *Page, err error) 
 	if value, ok := puo.mutation.IsHTTPS(); ok {
 		_spec.SetField(page.FieldIsHTTPS, field.TypeBool, value)
 	}
-	if value, ok := puo.mutation.IndexedURL(); ok {
-		_spec.SetField(page.FieldIndexedURL, field.TypeString, value)
+	if value, ok := puo.mutation.URL(); ok {
+		_spec.SetField(page.FieldURL, field.TypeString, value)
 	}
 	if value, ok := puo.mutation.Path(); ok {
 		_spec.SetField(page.FieldPath, field.TypeString, value)
 	}
 	if value, ok := puo.mutation.Querystring(); ok {
 		_spec.SetField(page.FieldQuerystring, field.TypeString, value)
-	}
-	if value, ok := puo.mutation.URL(); ok {
-		_spec.SetField(page.FieldURL, field.TypeString, value)
 	}
 	if value, ok := puo.mutation.CountReferred(); ok {
 		_spec.SetField(page.FieldCountReferred, field.TypeInt64, value)
@@ -1807,7 +1728,7 @@ func (puo *PageUpdateOne) sqlSave(ctx context.Context) (_node *Page, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
+					Type:   field.TypeUUID,
 					Column: pagesource.FieldID,
 				},
 			},
@@ -1823,7 +1744,7 @@ func (puo *PageUpdateOne) sqlSave(ctx context.Context) (_node *Page, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
+					Type:   field.TypeUUID,
 					Column: pagesource.FieldID,
 				},
 			},
@@ -1842,7 +1763,7 @@ func (puo *PageUpdateOne) sqlSave(ctx context.Context) (_node *Page, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
+					Type:   field.TypeUUID,
 					Column: pagesource.FieldID,
 				},
 			},

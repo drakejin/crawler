@@ -16,8 +16,8 @@ type Tx struct {
 	config
 	// Page is the client for interacting with the Page builders.
 	Page *PageClient
-	// PageLink is the client for interacting with the PageLink builders.
-	PageLink *PageLinkClient
+	// PageReferred is the client for interacting with the PageReferred builders.
+	PageReferred *PageReferredClient
 	// PageSource is the client for interacting with the PageSource builders.
 	PageSource *PageSourceClient
 
@@ -152,7 +152,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.Page = NewPageClient(tx.config)
-	tx.PageLink = NewPageLinkClient(tx.config)
+	tx.PageReferred = NewPageReferredClient(tx.config)
 	tx.PageSource = NewPageSourceClient(tx.config)
 }
 

@@ -9,15 +9,14 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/drakejin/crawler/internal/storage/db/ent/page"
+	"github.com/google/uuid"
 )
 
 // Page is the model entity for the Page schema.
 type Page struct {
 	config `json:"-"`
 	// ID of the ent.
-	ID string `json:"id,omitempty"`
-	// ReferredID holds the value of the "referred_id" field.
-	ReferredID string `json:"referred_id,omitempty"`
+	ID uuid.UUID `json:"id,omitempty"`
 	// CrawlingVersion holds the value of the "crawling_version" field.
 	CrawlingVersion string `json:"crawling_version,omitempty"`
 	// domain www.example.com
@@ -27,13 +26,11 @@ type Page struct {
 	// is used tls/ssl layer flag
 	IsHTTPS bool `json:"is_https,omitempty"`
 	// url for only indexing
-	IndexedURL string `json:"indexed_url,omitempty"`
+	URL string `json:"url,omitempty"`
 	// url.path
 	Path string `json:"path,omitempty"`
 	// url.querystring
 	Querystring string `json:"querystring,omitempty"`
-	// this mean url
-	URL string `json:"url,omitempty"`
 	// how many times referred
 	CountReferred int64 `json:"count_referred,omitempty"`
 	// 해당 row는 쓸 수 있는지? 없는지?
@@ -132,10 +129,12 @@ func (*Page) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case page.FieldCountReferred:
 			values[i] = new(sql.NullInt64)
-		case page.FieldID, page.FieldReferredID, page.FieldCrawlingVersion, page.FieldDomain, page.FieldPort, page.FieldIndexedURL, page.FieldPath, page.FieldQuerystring, page.FieldURL, page.FieldStatus, page.FieldCreatedBy, page.FieldUpdatedBy, page.FieldTitle, page.FieldDescription, page.FieldKeywords, page.FieldContentLanguage, page.FieldTwitterCard, page.FieldTwitterURL, page.FieldTwitterTitle, page.FieldTwitterDescription, page.FieldTwitterImage, page.FieldOgSiteName, page.FieldOgLocale, page.FieldOgTitle, page.FieldOgDescription, page.FieldOgType, page.FieldOgURL, page.FieldOgImage, page.FieldOgImageType, page.FieldOgImageURL, page.FieldOgImageSecureURL, page.FieldOgImageWidth, page.FieldOgImageHeight, page.FieldOgVideo, page.FieldOgVideoType, page.FieldOgVideoURL, page.FieldOgVideoSecureURL, page.FieldOgVideoWidth, page.FieldOgVideoHeight:
+		case page.FieldCrawlingVersion, page.FieldDomain, page.FieldPort, page.FieldURL, page.FieldPath, page.FieldQuerystring, page.FieldStatus, page.FieldCreatedBy, page.FieldUpdatedBy, page.FieldTitle, page.FieldDescription, page.FieldKeywords, page.FieldContentLanguage, page.FieldTwitterCard, page.FieldTwitterURL, page.FieldTwitterTitle, page.FieldTwitterDescription, page.FieldTwitterImage, page.FieldOgSiteName, page.FieldOgLocale, page.FieldOgTitle, page.FieldOgDescription, page.FieldOgType, page.FieldOgURL, page.FieldOgImage, page.FieldOgImageType, page.FieldOgImageURL, page.FieldOgImageSecureURL, page.FieldOgImageWidth, page.FieldOgImageHeight, page.FieldOgVideo, page.FieldOgVideoType, page.FieldOgVideoURL, page.FieldOgVideoSecureURL, page.FieldOgVideoWidth, page.FieldOgVideoHeight:
 			values[i] = new(sql.NullString)
 		case page.FieldCreatedAt, page.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
+		case page.FieldID:
+			values[i] = new(uuid.UUID)
 		default:
 			return nil, fmt.Errorf("unexpected column %q for type Page", columns[i])
 		}
@@ -152,16 +151,10 @@ func (pa *Page) assignValues(columns []string, values []any) error {
 	for i := range columns {
 		switch columns[i] {
 		case page.FieldID:
-			if value, ok := values[i].(*sql.NullString); !ok {
+			if value, ok := values[i].(*uuid.UUID); !ok {
 				return fmt.Errorf("unexpected type %T for field id", values[i])
-			} else if value.Valid {
-				pa.ID = value.String
-			}
-		case page.FieldReferredID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field referred_id", values[i])
-			} else if value.Valid {
-				pa.ReferredID = value.String
+			} else if value != nil {
+				pa.ID = *value
 			}
 		case page.FieldCrawlingVersion:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -187,11 +180,11 @@ func (pa *Page) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				pa.IsHTTPS = value.Bool
 			}
-		case page.FieldIndexedURL:
+		case page.FieldURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field indexed_url", values[i])
+				return fmt.Errorf("unexpected type %T for field url", values[i])
 			} else if value.Valid {
-				pa.IndexedURL = value.String
+				pa.URL = value.String
 			}
 		case page.FieldPath:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -204,12 +197,6 @@ func (pa *Page) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field querystring", values[i])
 			} else if value.Valid {
 				pa.Querystring = value.String
-			}
-		case page.FieldURL:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field url", values[i])
-			} else if value.Valid {
-				pa.URL = value.String
 			}
 		case page.FieldCountReferred:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -442,9 +429,6 @@ func (pa *Page) String() string {
 	var builder strings.Builder
 	builder.WriteString("Page(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", pa.ID))
-	builder.WriteString("referred_id=")
-	builder.WriteString(pa.ReferredID)
-	builder.WriteString(", ")
 	builder.WriteString("crawling_version=")
 	builder.WriteString(pa.CrawlingVersion)
 	builder.WriteString(", ")
@@ -457,17 +441,14 @@ func (pa *Page) String() string {
 	builder.WriteString("is_https=")
 	builder.WriteString(fmt.Sprintf("%v", pa.IsHTTPS))
 	builder.WriteString(", ")
-	builder.WriteString("indexed_url=")
-	builder.WriteString(pa.IndexedURL)
+	builder.WriteString("url=")
+	builder.WriteString(pa.URL)
 	builder.WriteString(", ")
 	builder.WriteString("path=")
 	builder.WriteString(pa.Path)
 	builder.WriteString(", ")
 	builder.WriteString("querystring=")
 	builder.WriteString(pa.Querystring)
-	builder.WriteString(", ")
-	builder.WriteString("url=")
-	builder.WriteString(pa.URL)
 	builder.WriteString(", ")
 	builder.WriteString("count_referred=")
 	builder.WriteString(fmt.Sprintf("%v", pa.CountReferred))

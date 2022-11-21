@@ -22,15 +22,15 @@ func (f PageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 	return f(ctx, mv)
 }
 
-// The PageLinkFunc type is an adapter to allow the use of ordinary
-// function as PageLink mutator.
-type PageLinkFunc func(context.Context, *ent.PageLinkMutation) (ent.Value, error)
+// The PageReferredFunc type is an adapter to allow the use of ordinary
+// function as PageReferred mutator.
+type PageReferredFunc func(context.Context, *ent.PageReferredMutation) (ent.Value, error)
 
 // Mutate calls f(ctx, m).
-func (f PageLinkFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	mv, ok := m.(*ent.PageLinkMutation)
+func (f PageReferredFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	mv, ok := m.(*ent.PageReferredMutation)
 	if !ok {
-		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PageLinkMutation", m)
+		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PageReferredMutation", m)
 	}
 	return f(ctx, mv)
 }

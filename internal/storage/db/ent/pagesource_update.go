@@ -10,7 +10,6 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/drakejin/crawler/internal/storage/db/ent/page"
 	"github.com/drakejin/crawler/internal/storage/db/ent/pagesource"
 	"github.com/drakejin/crawler/internal/storage/db/ent/predicate"
 )
@@ -28,46 +27,6 @@ func (psu *PageSourceUpdate) Where(ps ...predicate.PageSource) *PageSourceUpdate
 	return psu
 }
 
-// SetPageID sets the "page_id" field.
-func (psu *PageSourceUpdate) SetPageID(s string) *PageSourceUpdate {
-	psu.mutation.SetPageID(s)
-	return psu
-}
-
-// SetReferredPageID sets the "referred_page_id" field.
-func (psu *PageSourceUpdate) SetReferredPageID(s string) *PageSourceUpdate {
-	psu.mutation.SetReferredPageID(s)
-	return psu
-}
-
-// SetURL sets the "url" field.
-func (psu *PageSourceUpdate) SetURL(s string) *PageSourceUpdate {
-	psu.mutation.SetURL(s)
-	return psu
-}
-
-// SetNillableURL sets the "url" field if the given value is not nil.
-func (psu *PageSourceUpdate) SetNillableURL(s *string) *PageSourceUpdate {
-	if s != nil {
-		psu.SetURL(*s)
-	}
-	return psu
-}
-
-// SetReferredURL sets the "referred_url" field.
-func (psu *PageSourceUpdate) SetReferredURL(s string) *PageSourceUpdate {
-	psu.mutation.SetReferredURL(s)
-	return psu
-}
-
-// SetNillableReferredURL sets the "referred_url" field if the given value is not nil.
-func (psu *PageSourceUpdate) SetNillableReferredURL(s *string) *PageSourceUpdate {
-	if s != nil {
-		psu.SetReferredURL(*s)
-	}
-	return psu
-}
-
 // SetSource sets the "source" field.
 func (psu *PageSourceUpdate) SetSource(s string) *PageSourceUpdate {
 	psu.mutation.SetSource(s)
@@ -82,20 +41,9 @@ func (psu *PageSourceUpdate) SetNillableSource(s *string) *PageSourceUpdate {
 	return psu
 }
 
-// SetPage sets the "page" edge to the Page entity.
-func (psu *PageSourceUpdate) SetPage(p *Page) *PageSourceUpdate {
-	return psu.SetPageID(p.ID)
-}
-
 // Mutation returns the PageSourceMutation object of the builder.
 func (psu *PageSourceUpdate) Mutation() *PageSourceMutation {
 	return psu.mutation
-}
-
-// ClearPage clears the "page" edge to the Page entity.
-func (psu *PageSourceUpdate) ClearPage() *PageSourceUpdate {
-	psu.mutation.ClearPage()
-	return psu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -105,18 +53,12 @@ func (psu *PageSourceUpdate) Save(ctx context.Context) (int, error) {
 		affected int
 	)
 	if len(psu.hooks) == 0 {
-		if err = psu.check(); err != nil {
-			return 0, err
-		}
 		affected, err = psu.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*PageSourceMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
-			}
-			if err = psu.check(); err != nil {
-				return 0, err
 			}
 			psu.mutation = mutation
 			affected, err = psu.sqlSave(ctx)
@@ -158,21 +100,13 @@ func (psu *PageSourceUpdate) ExecX(ctx context.Context) {
 	}
 }
 
-// check runs all checks and user-defined validators on the builder.
-func (psu *PageSourceUpdate) check() error {
-	if _, ok := psu.mutation.PageID(); psu.mutation.PageCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "PageSource.page"`)
-	}
-	return nil
-}
-
 func (psu *PageSourceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	_spec := &sqlgraph.UpdateSpec{
 		Node: &sqlgraph.NodeSpec{
 			Table:   pagesource.Table,
 			Columns: pagesource.Columns,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: pagesource.FieldID,
 			},
 		},
@@ -184,52 +118,8 @@ func (psu *PageSourceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			}
 		}
 	}
-	if value, ok := psu.mutation.ReferredPageID(); ok {
-		_spec.SetField(pagesource.FieldReferredPageID, field.TypeString, value)
-	}
-	if value, ok := psu.mutation.URL(); ok {
-		_spec.SetField(pagesource.FieldURL, field.TypeString, value)
-	}
-	if value, ok := psu.mutation.ReferredURL(); ok {
-		_spec.SetField(pagesource.FieldReferredURL, field.TypeString, value)
-	}
 	if value, ok := psu.mutation.Source(); ok {
 		_spec.SetField(pagesource.FieldSource, field.TypeString, value)
-	}
-	if psu.mutation.PageCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   pagesource.PageTable,
-			Columns: []string{pagesource.PageColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
-					Column: page.FieldID,
-				},
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := psu.mutation.PageIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   pagesource.PageTable,
-			Columns: []string{pagesource.PageColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
-					Column: page.FieldID,
-				},
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, psu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -250,46 +140,6 @@ type PageSourceUpdateOne struct {
 	mutation *PageSourceMutation
 }
 
-// SetPageID sets the "page_id" field.
-func (psuo *PageSourceUpdateOne) SetPageID(s string) *PageSourceUpdateOne {
-	psuo.mutation.SetPageID(s)
-	return psuo
-}
-
-// SetReferredPageID sets the "referred_page_id" field.
-func (psuo *PageSourceUpdateOne) SetReferredPageID(s string) *PageSourceUpdateOne {
-	psuo.mutation.SetReferredPageID(s)
-	return psuo
-}
-
-// SetURL sets the "url" field.
-func (psuo *PageSourceUpdateOne) SetURL(s string) *PageSourceUpdateOne {
-	psuo.mutation.SetURL(s)
-	return psuo
-}
-
-// SetNillableURL sets the "url" field if the given value is not nil.
-func (psuo *PageSourceUpdateOne) SetNillableURL(s *string) *PageSourceUpdateOne {
-	if s != nil {
-		psuo.SetURL(*s)
-	}
-	return psuo
-}
-
-// SetReferredURL sets the "referred_url" field.
-func (psuo *PageSourceUpdateOne) SetReferredURL(s string) *PageSourceUpdateOne {
-	psuo.mutation.SetReferredURL(s)
-	return psuo
-}
-
-// SetNillableReferredURL sets the "referred_url" field if the given value is not nil.
-func (psuo *PageSourceUpdateOne) SetNillableReferredURL(s *string) *PageSourceUpdateOne {
-	if s != nil {
-		psuo.SetReferredURL(*s)
-	}
-	return psuo
-}
-
 // SetSource sets the "source" field.
 func (psuo *PageSourceUpdateOne) SetSource(s string) *PageSourceUpdateOne {
 	psuo.mutation.SetSource(s)
@@ -304,20 +154,9 @@ func (psuo *PageSourceUpdateOne) SetNillableSource(s *string) *PageSourceUpdateO
 	return psuo
 }
 
-// SetPage sets the "page" edge to the Page entity.
-func (psuo *PageSourceUpdateOne) SetPage(p *Page) *PageSourceUpdateOne {
-	return psuo.SetPageID(p.ID)
-}
-
 // Mutation returns the PageSourceMutation object of the builder.
 func (psuo *PageSourceUpdateOne) Mutation() *PageSourceMutation {
 	return psuo.mutation
-}
-
-// ClearPage clears the "page" edge to the Page entity.
-func (psuo *PageSourceUpdateOne) ClearPage() *PageSourceUpdateOne {
-	psuo.mutation.ClearPage()
-	return psuo
 }
 
 // Select allows selecting one or more fields (columns) of the returned entity.
@@ -334,18 +173,12 @@ func (psuo *PageSourceUpdateOne) Save(ctx context.Context) (*PageSource, error) 
 		node *PageSource
 	)
 	if len(psuo.hooks) == 0 {
-		if err = psuo.check(); err != nil {
-			return nil, err
-		}
 		node, err = psuo.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*PageSourceMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
-			}
-			if err = psuo.check(); err != nil {
-				return nil, err
 			}
 			psuo.mutation = mutation
 			node, err = psuo.sqlSave(ctx)
@@ -393,21 +226,13 @@ func (psuo *PageSourceUpdateOne) ExecX(ctx context.Context) {
 	}
 }
 
-// check runs all checks and user-defined validators on the builder.
-func (psuo *PageSourceUpdateOne) check() error {
-	if _, ok := psuo.mutation.PageID(); psuo.mutation.PageCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "PageSource.page"`)
-	}
-	return nil
-}
-
 func (psuo *PageSourceUpdateOne) sqlSave(ctx context.Context) (_node *PageSource, err error) {
 	_spec := &sqlgraph.UpdateSpec{
 		Node: &sqlgraph.NodeSpec{
 			Table:   pagesource.Table,
 			Columns: pagesource.Columns,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: pagesource.FieldID,
 			},
 		},
@@ -436,52 +261,8 @@ func (psuo *PageSourceUpdateOne) sqlSave(ctx context.Context) (_node *PageSource
 			}
 		}
 	}
-	if value, ok := psuo.mutation.ReferredPageID(); ok {
-		_spec.SetField(pagesource.FieldReferredPageID, field.TypeString, value)
-	}
-	if value, ok := psuo.mutation.URL(); ok {
-		_spec.SetField(pagesource.FieldURL, field.TypeString, value)
-	}
-	if value, ok := psuo.mutation.ReferredURL(); ok {
-		_spec.SetField(pagesource.FieldReferredURL, field.TypeString, value)
-	}
 	if value, ok := psuo.mutation.Source(); ok {
 		_spec.SetField(pagesource.FieldSource, field.TypeString, value)
-	}
-	if psuo.mutation.PageCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   pagesource.PageTable,
-			Columns: []string{pagesource.PageColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
-					Column: page.FieldID,
-				},
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := psuo.mutation.PageIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   pagesource.PageTable,
-			Columns: []string{pagesource.PageColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: &sqlgraph.FieldSpec{
-					Type:   field.TypeString,
-					Column: page.FieldID,
-				},
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &PageSource{config: psuo.config}
 	_spec.Assign = _node.assignValues

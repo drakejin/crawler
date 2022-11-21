@@ -72,7 +72,7 @@ func (psd *PageSourceDelete) sqlExec(ctx context.Context) (int, error) {
 		Node: &sqlgraph.NodeSpec{
 			Table: pagesource.Table,
 			ID: &sqlgraph.FieldSpec{
-				Type:   field.TypeString,
+				Type:   field.TypeUUID,
 				Column: pagesource.FieldID,
 			},
 		},

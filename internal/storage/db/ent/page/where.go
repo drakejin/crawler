@@ -8,31 +8,32 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/drakejin/crawler/internal/storage/db/ent/predicate"
+	"github.com/google/uuid"
 )
 
 // ID filters vertices based on their ID field.
-func ID(id string) predicate.Page {
+func ID(id uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldID), id))
 	})
 }
 
 // IDEQ applies the EQ predicate on the ID field.
-func IDEQ(id string) predicate.Page {
+func IDEQ(id uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldID), id))
 	})
 }
 
 // IDNEQ applies the NEQ predicate on the ID field.
-func IDNEQ(id string) predicate.Page {
+func IDNEQ(id uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.NEQ(s.C(FieldID), id))
 	})
 }
 
 // IDIn applies the In predicate on the ID field.
-func IDIn(ids ...string) predicate.Page {
+func IDIn(ids ...uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		v := make([]any, len(ids))
 		for i := range v {
@@ -43,7 +44,7 @@ func IDIn(ids ...string) predicate.Page {
 }
 
 // IDNotIn applies the NotIn predicate on the ID field.
-func IDNotIn(ids ...string) predicate.Page {
+func IDNotIn(ids ...uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		v := make([]any, len(ids))
 		for i := range v {
@@ -54,37 +55,30 @@ func IDNotIn(ids ...string) predicate.Page {
 }
 
 // IDGT applies the GT predicate on the ID field.
-func IDGT(id string) predicate.Page {
+func IDGT(id uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.GT(s.C(FieldID), id))
 	})
 }
 
 // IDGTE applies the GTE predicate on the ID field.
-func IDGTE(id string) predicate.Page {
+func IDGTE(id uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.GTE(s.C(FieldID), id))
 	})
 }
 
 // IDLT applies the LT predicate on the ID field.
-func IDLT(id string) predicate.Page {
+func IDLT(id uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.LT(s.C(FieldID), id))
 	})
 }
 
 // IDLTE applies the LTE predicate on the ID field.
-func IDLTE(id string) predicate.Page {
+func IDLTE(id uuid.UUID) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.LTE(s.C(FieldID), id))
-	})
-}
-
-// ReferredID applies equality check predicate on the "referred_id" field. It's identical to ReferredIDEQ.
-func ReferredID(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldReferredID), v))
 	})
 }
 
@@ -116,10 +110,10 @@ func IsHTTPS(v bool) predicate.Page {
 	})
 }
 
-// IndexedURL applies equality check predicate on the "indexed_url" field. It's identical to IndexedURLEQ.
-func IndexedURL(v string) predicate.Page {
+// URL applies equality check predicate on the "url" field. It's identical to URLEQ.
+func URL(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldIndexedURL), v))
+		s.Where(sql.EQ(s.C(FieldURL), v))
 	})
 }
 
@@ -134,13 +128,6 @@ func Path(v string) predicate.Page {
 func Querystring(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldQuerystring), v))
-	})
-}
-
-// URL applies equality check predicate on the "url" field. It's identical to URLEQ.
-func URL(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldURL), v))
 	})
 }
 
@@ -365,105 +352,6 @@ func OgVideoWidth(v string) predicate.Page {
 func OgVideoHeight(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldOgVideoHeight), v))
-	})
-}
-
-// ReferredIDEQ applies the EQ predicate on the "referred_id" field.
-func ReferredIDEQ(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDNEQ applies the NEQ predicate on the "referred_id" field.
-func ReferredIDNEQ(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.NEQ(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDIn applies the In predicate on the "referred_id" field.
-func ReferredIDIn(vs ...string) predicate.Page {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.In(s.C(FieldReferredID), v...))
-	})
-}
-
-// ReferredIDNotIn applies the NotIn predicate on the "referred_id" field.
-func ReferredIDNotIn(vs ...string) predicate.Page {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.NotIn(s.C(FieldReferredID), v...))
-	})
-}
-
-// ReferredIDGT applies the GT predicate on the "referred_id" field.
-func ReferredIDGT(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.GT(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDGTE applies the GTE predicate on the "referred_id" field.
-func ReferredIDGTE(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.GTE(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDLT applies the LT predicate on the "referred_id" field.
-func ReferredIDLT(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.LT(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDLTE applies the LTE predicate on the "referred_id" field.
-func ReferredIDLTE(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.LTE(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDContains applies the Contains predicate on the "referred_id" field.
-func ReferredIDContains(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.Contains(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDHasPrefix applies the HasPrefix predicate on the "referred_id" field.
-func ReferredIDHasPrefix(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.HasPrefix(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDHasSuffix applies the HasSuffix predicate on the "referred_id" field.
-func ReferredIDHasSuffix(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.HasSuffix(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDEqualFold applies the EqualFold predicate on the "referred_id" field.
-func ReferredIDEqualFold(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EqualFold(s.C(FieldReferredID), v))
-	})
-}
-
-// ReferredIDContainsFold applies the ContainsFold predicate on the "referred_id" field.
-func ReferredIDContainsFold(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.ContainsFold(s.C(FieldReferredID), v))
 	})
 }
 
@@ -778,102 +666,102 @@ func IsHTTPSNEQ(v bool) predicate.Page {
 	})
 }
 
-// IndexedURLEQ applies the EQ predicate on the "indexed_url" field.
-func IndexedURLEQ(v string) predicate.Page {
+// URLEQ applies the EQ predicate on the "url" field.
+func URLEQ(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldIndexedURL), v))
+		s.Where(sql.EQ(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLNEQ applies the NEQ predicate on the "indexed_url" field.
-func IndexedURLNEQ(v string) predicate.Page {
+// URLNEQ applies the NEQ predicate on the "url" field.
+func URLNEQ(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.NEQ(s.C(FieldIndexedURL), v))
+		s.Where(sql.NEQ(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLIn applies the In predicate on the "indexed_url" field.
-func IndexedURLIn(vs ...string) predicate.Page {
+// URLIn applies the In predicate on the "url" field.
+func URLIn(vs ...string) predicate.Page {
 	v := make([]any, len(vs))
 	for i := range v {
 		v[i] = vs[i]
 	}
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.In(s.C(FieldIndexedURL), v...))
+		s.Where(sql.In(s.C(FieldURL), v...))
 	})
 }
 
-// IndexedURLNotIn applies the NotIn predicate on the "indexed_url" field.
-func IndexedURLNotIn(vs ...string) predicate.Page {
+// URLNotIn applies the NotIn predicate on the "url" field.
+func URLNotIn(vs ...string) predicate.Page {
 	v := make([]any, len(vs))
 	for i := range v {
 		v[i] = vs[i]
 	}
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.NotIn(s.C(FieldIndexedURL), v...))
+		s.Where(sql.NotIn(s.C(FieldURL), v...))
 	})
 }
 
-// IndexedURLGT applies the GT predicate on the "indexed_url" field.
-func IndexedURLGT(v string) predicate.Page {
+// URLGT applies the GT predicate on the "url" field.
+func URLGT(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.GT(s.C(FieldIndexedURL), v))
+		s.Where(sql.GT(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLGTE applies the GTE predicate on the "indexed_url" field.
-func IndexedURLGTE(v string) predicate.Page {
+// URLGTE applies the GTE predicate on the "url" field.
+func URLGTE(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.GTE(s.C(FieldIndexedURL), v))
+		s.Where(sql.GTE(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLLT applies the LT predicate on the "indexed_url" field.
-func IndexedURLLT(v string) predicate.Page {
+// URLLT applies the LT predicate on the "url" field.
+func URLLT(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.LT(s.C(FieldIndexedURL), v))
+		s.Where(sql.LT(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLLTE applies the LTE predicate on the "indexed_url" field.
-func IndexedURLLTE(v string) predicate.Page {
+// URLLTE applies the LTE predicate on the "url" field.
+func URLLTE(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.LTE(s.C(FieldIndexedURL), v))
+		s.Where(sql.LTE(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLContains applies the Contains predicate on the "indexed_url" field.
-func IndexedURLContains(v string) predicate.Page {
+// URLContains applies the Contains predicate on the "url" field.
+func URLContains(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.Contains(s.C(FieldIndexedURL), v))
+		s.Where(sql.Contains(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLHasPrefix applies the HasPrefix predicate on the "indexed_url" field.
-func IndexedURLHasPrefix(v string) predicate.Page {
+// URLHasPrefix applies the HasPrefix predicate on the "url" field.
+func URLHasPrefix(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.HasPrefix(s.C(FieldIndexedURL), v))
+		s.Where(sql.HasPrefix(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLHasSuffix applies the HasSuffix predicate on the "indexed_url" field.
-func IndexedURLHasSuffix(v string) predicate.Page {
+// URLHasSuffix applies the HasSuffix predicate on the "url" field.
+func URLHasSuffix(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.HasSuffix(s.C(FieldIndexedURL), v))
+		s.Where(sql.HasSuffix(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLEqualFold applies the EqualFold predicate on the "indexed_url" field.
-func IndexedURLEqualFold(v string) predicate.Page {
+// URLEqualFold applies the EqualFold predicate on the "url" field.
+func URLEqualFold(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EqualFold(s.C(FieldIndexedURL), v))
+		s.Where(sql.EqualFold(s.C(FieldURL), v))
 	})
 }
 
-// IndexedURLContainsFold applies the ContainsFold predicate on the "indexed_url" field.
-func IndexedURLContainsFold(v string) predicate.Page {
+// URLContainsFold applies the ContainsFold predicate on the "url" field.
+func URLContainsFold(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.ContainsFold(s.C(FieldIndexedURL), v))
+		s.Where(sql.ContainsFold(s.C(FieldURL), v))
 	})
 }
 
@@ -1072,105 +960,6 @@ func QuerystringEqualFold(v string) predicate.Page {
 func QuerystringContainsFold(v string) predicate.Page {
 	return predicate.Page(func(s *sql.Selector) {
 		s.Where(sql.ContainsFold(s.C(FieldQuerystring), v))
-	})
-}
-
-// URLEQ applies the EQ predicate on the "url" field.
-func URLEQ(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EQ(s.C(FieldURL), v))
-	})
-}
-
-// URLNEQ applies the NEQ predicate on the "url" field.
-func URLNEQ(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.NEQ(s.C(FieldURL), v))
-	})
-}
-
-// URLIn applies the In predicate on the "url" field.
-func URLIn(vs ...string) predicate.Page {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.In(s.C(FieldURL), v...))
-	})
-}
-
-// URLNotIn applies the NotIn predicate on the "url" field.
-func URLNotIn(vs ...string) predicate.Page {
-	v := make([]any, len(vs))
-	for i := range v {
-		v[i] = vs[i]
-	}
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.NotIn(s.C(FieldURL), v...))
-	})
-}
-
-// URLGT applies the GT predicate on the "url" field.
-func URLGT(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.GT(s.C(FieldURL), v))
-	})
-}
-
-// URLGTE applies the GTE predicate on the "url" field.
-func URLGTE(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.GTE(s.C(FieldURL), v))
-	})
-}
-
-// URLLT applies the LT predicate on the "url" field.
-func URLLT(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.LT(s.C(FieldURL), v))
-	})
-}
-
-// URLLTE applies the LTE predicate on the "url" field.
-func URLLTE(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.LTE(s.C(FieldURL), v))
-	})
-}
-
-// URLContains applies the Contains predicate on the "url" field.
-func URLContains(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.Contains(s.C(FieldURL), v))
-	})
-}
-
-// URLHasPrefix applies the HasPrefix predicate on the "url" field.
-func URLHasPrefix(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.HasPrefix(s.C(FieldURL), v))
-	})
-}
-
-// URLHasSuffix applies the HasSuffix predicate on the "url" field.
-func URLHasSuffix(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.HasSuffix(s.C(FieldURL), v))
-	})
-}
-
-// URLEqualFold applies the EqualFold predicate on the "url" field.
-func URLEqualFold(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.EqualFold(s.C(FieldURL), v))
-	})
-}
-
-// URLContainsFold applies the ContainsFold predicate on the "url" field.
-func URLContainsFold(v string) predicate.Page {
-	return predicate.Page(func(s *sql.Selector) {
-		s.Where(sql.ContainsFold(s.C(FieldURL), v))
 	})
 }
 

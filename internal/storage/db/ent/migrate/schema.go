@@ -11,16 +11,14 @@ import (
 var (
 	// PageColumns holds the columns for the "page" table.
 	PageColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeString, Unique: true},
-		{Name: "referred_id", Type: field.TypeString},
+		{Name: "id", Type: field.TypeUUID, Unique: true},
 		{Name: "crawling_version", Type: field.TypeString},
 		{Name: "domain", Type: field.TypeString, Unique: true, Size: 700},
 		{Name: "port", Type: field.TypeString, Size: 30, Default: "80"},
 		{Name: "is_https", Type: field.TypeBool, Default: false},
-		{Name: "indexed_url", Type: field.TypeString, Size: 1000, Default: ""},
+		{Name: "url", Type: field.TypeString, Size: 750},
 		{Name: "path", Type: field.TypeString, Size: 1000, Default: ""},
 		{Name: "querystring", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
-		{Name: "url", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
 		{Name: "count_referred", Type: field.TypeInt64, Default: 0},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"ALLOW", "NOTALLOW", "DELETE"}, Default: "ALLOW"},
 		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP", SchemaType: map[string]string{"mysql": "datetime"}},
@@ -62,58 +60,55 @@ var (
 		PrimaryKey: []*schema.Column{PageColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "page_crawling_version",
-				Unique:  false,
-				Columns: []*schema.Column{PageColumns[2]},
+				Name:    "ux_url",
+				Unique:  true,
+				Columns: []*schema.Column{PageColumns[5]},
 			},
 			{
-				Name:    "page_referred_id",
-				Unique:  false,
+				Name:    "ux_url_and_crawling_version",
+				Unique:  true,
 				Columns: []*schema.Column{PageColumns[1]},
 			},
 		},
 	}
-	// PageLinksColumns holds the columns for the "page_links" table.
-	PageLinksColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt64, Increment: true},
-		{Name: "source_id", Type: field.TypeInt64},
-		{Name: "target_id", Type: field.TypeInt64},
+	// PageReferredColumns holds the columns for the "page_referred" table.
+	PageReferredColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID, Unique: true},
+		{Name: "source_id", Type: field.TypeUUID},
+		{Name: "target_id", Type: field.TypeUUID},
 		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP", SchemaType: map[string]string{"mysql": "datetime"}},
 		{Name: "created_by", Type: field.TypeString, Size: 300},
 		{Name: "updated_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP", SchemaType: map[string]string{"mysql": "datetime"}},
 		{Name: "updated_by", Type: field.TypeString, Size: 300},
 	}
-	// PageLinksTable holds the schema information for the "page_links" table.
-	PageLinksTable = &schema.Table{
-		Name:       "page_links",
-		Columns:    PageLinksColumns,
-		PrimaryKey: []*schema.Column{PageLinksColumns[0]},
+	// PageReferredTable holds the schema information for the "page_referred" table.
+	PageReferredTable = &schema.Table{
+		Name:       "page_referred",
+		Columns:    PageReferredColumns,
+		PrimaryKey: []*schema.Column{PageReferredColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "pagelink_source_id_target_id",
+				Name:    "ux_source_id_and_target_id",
 				Unique:  true,
-				Columns: []*schema.Column{PageLinksColumns[1], PageLinksColumns[2]},
+				Columns: []*schema.Column{PageReferredColumns[1], PageReferredColumns[2]},
 			},
 			{
-				Name:    "pagelink_source_id",
+				Name:    "pagereferred_source_id",
 				Unique:  false,
-				Columns: []*schema.Column{PageLinksColumns[1]},
+				Columns: []*schema.Column{PageReferredColumns[1]},
 			},
 			{
-				Name:    "pagelink_target_id",
+				Name:    "pagereferred_target_id",
 				Unique:  false,
-				Columns: []*schema.Column{PageLinksColumns[2]},
+				Columns: []*schema.Column{PageReferredColumns[2]},
 			},
 		},
 	}
 	// PageSourceColumns holds the columns for the "page_source" table.
 	PageSourceColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeString, Unique: true},
-		{Name: "referred_page_id", Type: field.TypeString},
-		{Name: "url", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
-		{Name: "referred_url", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
-		{Name: "source", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
-		{Name: "page_id", Type: field.TypeString},
+		{Name: "id", Type: field.TypeUUID, Unique: true},
+		{Name: "source", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "mediumtext"}},
+		{Name: "page_page_source", Type: field.TypeUUID, Nullable: true},
 	}
 	// PageSourceTable holds the schema information for the "page_source" table.
 	PageSourceTable = &schema.Table{
@@ -123,16 +118,16 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "page_source_page_page_source",
-				Columns:    []*schema.Column{PageSourceColumns[5]},
+				Columns:    []*schema.Column{PageSourceColumns[2]},
 				RefColumns: []*schema.Column{PageColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		PageTable,
-		PageLinksTable,
+		PageReferredTable,
 		PageSourceTable,
 	}
 )
@@ -143,8 +138,8 @@ func init() {
 		Charset:   "utf8mb4",
 		Collation: "utf8mb4_0900_ai_ci",
 	}
-	PageLinksTable.Annotation = &entsql.Annotation{
-		Table:     "page_links",
+	PageReferredTable.Annotation = &entsql.Annotation{
+		Table:     "page_referred",
 		Charset:   "utf8mb4",
 		Collation: "utf8mb4_0900_ai_ci",
 	}
