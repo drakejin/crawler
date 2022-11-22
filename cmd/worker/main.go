@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"net/http"
-	"time"
-
 	edgemysql "github.com/drakejin/crawler/edge/mysql"
 	"github.com/drakejin/crawler/internal/crawler"
 	storagedb "github.com/drakejin/crawler/internal/storage/db"
+	"net/http"
 )
 
 var client = &http.Client{}
@@ -26,9 +24,6 @@ func main() {
 
 	c := crawler.New(storageDB.Client(), 10, "20221121_2208")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	c.Crawler(ctx, nil, "https://gall.dcinside.com/board/view/?id=dcbest&no=92769")
+	c.Crawler(context.Background(), nil, "https://9gag.com/trending")
 	// c.Crawler(ctx, "", "https://www.hostinger.com/tutorials/uri-vs-url")
 }

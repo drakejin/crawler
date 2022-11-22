@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/drakejin/crawler/internal/storage/db/ent"
 	"time"
 
 	"github.com/google/uuid"
@@ -110,4 +111,54 @@ type PageSource struct {
 	ID uuid.UUID `json:"id,omitempty"`
 	// html view source code
 	Source string `json:"source,omitempty"`
+}
+
+func ParsePageFromEnt(v *ent.Page) *Page {
+	return &Page{
+		ID:              v.ID,
+		CrawlingVersion: v.CrawlingVersion,
+		Domain:          v.Domain,
+		Port:            v.Port,
+		IsHTTPS:         v.IsHTTPS,
+		Path:            v.Path,
+		Querystring:     v.Querystring,
+		URL:             v.URL,
+
+		CountReferred: v.CountReferred,
+		Status:        v.Status,
+		CreatedAt:     v.CreatedAt,
+		CreatedBy:     v.CreatedBy,
+		UpdatedAt:     v.UpdatedAt,
+		UpdatedBy:     v.UpdatedBy,
+
+		Title:           v.Title,
+		Description:     v.Description,
+		Keywords:        v.Keywords,
+		ContentLanguage: v.ContentLanguage,
+
+		TwitterCard:        v.TwitterCard,
+		TwitterURL:         v.TwitterURL,
+		TwitterTitle:       v.TwitterTitle,
+		TwitterDescription: v.TwitterDescription,
+		TwitterImage:       v.TwitterImage,
+
+		OgSiteName:       v.OgSiteName,
+		OgLocale:         v.OgLocale,
+		OgTitle:          v.OgTitle,
+		OgDescription:    v.OgDescription,
+		OgType:           v.OgType,
+		OgURL:            v.OgURL,
+		OgImage:          v.OgImage,
+		OgImageType:      v.OgImageType,
+		OgImageURL:       v.OgImageURL,
+		OgImageSecureURL: v.OgImageSecureURL,
+		OgImageWidth:     v.OgImageWidth,
+		OgImageHeight:    v.OgImageHeight,
+		OgVideo:          v.OgVideo,
+		OgVideoType:      v.OgVideoType,
+		OgVideoURL:       v.OgVideoURL,
+		OgVideoSecureURL: v.OgVideoSecureURL,
+		OgVideoWidth:     v.OgVideoWidth,
+		OgVideoHeight:    v.OgVideoHeight,
+	}
 }

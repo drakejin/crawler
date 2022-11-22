@@ -13,7 +13,7 @@ var (
 	PageColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID, Unique: true},
 		{Name: "crawling_version", Type: field.TypeString},
-		{Name: "domain", Type: field.TypeString, Unique: true, Size: 700},
+		{Name: "domain", Type: field.TypeString, Size: 700},
 		{Name: "port", Type: field.TypeString, Size: 30, Default: "80"},
 		{Name: "is_https", Type: field.TypeBool, Default: false},
 		{Name: "url", Type: field.TypeString, Size: 750},
