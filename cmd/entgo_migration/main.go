@@ -4,12 +4,13 @@ import (
 	"github.com/rs/zerolog/log"
 
 	edgemysql "github.com/drakejin/crawler/edge/mysql"
+	"github.com/drakejin/crawler/internal/config"
 	storagedb "github.com/drakejin/crawler/internal/storage/db"
 )
 
 func main() {
-
-	db, err := edgemysql.New("admin:passwd@tcp(localhost:23306)/indexer?parseTime=True")
+	cfg := config.MustNew()
+	db, err := edgemysql.New(cfg.DB.DSN)
 	defer db.Close()
 	if err != nil {
 		panic(err)

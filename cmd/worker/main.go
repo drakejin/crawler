@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
+	"net/http"
+
 	edgemysql "github.com/drakejin/crawler/edge/mysql"
+	"github.com/drakejin/crawler/internal/config"
 	"github.com/drakejin/crawler/internal/crawler"
 	storagedb "github.com/drakejin/crawler/internal/storage/db"
-	"net/http"
 )
 
 var client = &http.Client{}
 
 func main() {
-
-	sql, err := edgemysql.New("admin:passwd@tcp(localhost:23306)/indexer?parseTime=True")
+	cfg := config.MustNew()
+	sql, err := edgemysql.New(cfg.DB.DSN)
 	if err != nil {
 		panic(err)
 	}
