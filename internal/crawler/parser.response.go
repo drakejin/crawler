@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -31,7 +32,15 @@ func checkContentType(header http.Header) model.ContentType {
 	return model.ContentTypeNotSupport
 }
 
-func ParseHTML(crawlingVersion string, originUrl *url.URL, doc *goquery.Selection) (*model.Page, *model.PageSource, error) {
+func ParseHTML(crawlingVersion string, originUrl *url.URL, body io.ReadCloser) (*model.Page, *model.PageSource, error) {
+	doc, err := goquery.NewDocumentFromReader(body)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = body.Close(); err != nil {
+		return nil, nil, err
+	}
+
 	htmlSource, err := doc.Html()
 	if err != nil {
 		return nil, nil, err

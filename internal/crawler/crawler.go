@@ -5,8 +5,6 @@ import (
 	nativesql "database/sql"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/headzoo/surf"
-	"github.com/headzoo/surf/browser"
 	"github.com/motemen/go-loghttp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -29,22 +27,21 @@ type client struct {
 	maximumConcurrency   int
 	crawlingVersion      string
 	storageDB            *ent.Client
-	browser              browser.Browsable
+	client               *http.Client
 }
 
 func New(storageDB *ent.Client, maximumConcurrency int, crawlingVersion string) *client {
-	bow := surf.NewBrowser()
-	bow.SetTransport(&loghttp.Transport{
-		LogRequest: func(req *http.Request) {
-			log.Debug().Interface("header", req.Header).Msgf("[request] %s %s", req.Method, req.URL)
-		},
-		LogResponse: func(resp *http.Response) {
-			log.Debug().Interface("header", resp.Header).Msgf("[response] %d %s", resp.StatusCode, resp.Request.URL)
-		},
-	})
-	bow.SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36")
 	return &client{
-		browser:            bow,
+		client: &http.Client{
+			Transport: &loghttp.Transport{
+				LogRequest: func(req *http.Request) {
+					log.Debug().Interface("header", req.Header).Msgf("[request] %s %s", req.Method, req.URL)
+				},
+				LogResponse: func(resp *http.Response) {
+					log.Debug().Interface("header", resp.Header).Msgf("[response] %d %s", resp.StatusCode, resp.Request.URL)
+				},
+			},
+		},
 		storageDB:          storageDB,
 		maximumConcurrency: maximumConcurrency,
 		crawlingVersion:    crawlingVersion,
@@ -104,21 +101,34 @@ func (c *client) Crawler(ctx context.Context, referredPage *model.Page, targetUr
 		log.Warn().Err(err).Send()
 		return
 	}
-	err = c.browser.Open(u.String())
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		u.String(),
+		nil,
+	)
+	// https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers 의 userAgent를 활용하자.
+	req.Header.Set(_const.HeaderUserAgent, "APIs-Google (+https://developers.google.com/webmasters/APIs-Google.html)")
 	if err != nil {
 		log.Warn().Err(err).Send()
 		return
 	}
-	statusCode := c.browser.StatusCode()
-	if statusCode != _const.StatusOK {
-		if statusCode == _const.StatusTemporaryRedirect ||
-			statusCode == _const.StatusMovedPermanently ||
-			statusCode == _const.StatusFound ||
-			statusCode == _const.StatusSeeOther ||
-			statusCode == _const.StatusNotModified ||
-			statusCode == _const.StatusUseProxy ||
-			statusCode == _const.StatusPermanentRedirect {
-			u, err = url.Parse(c.browser.ResponseHeaders().Get(_const.HeaderLocation))
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		log.Warn().Err(err).Send()
+		return
+	}
+
+	if resp.StatusCode != _const.StatusOK {
+		if resp.StatusCode == _const.StatusTemporaryRedirect ||
+			resp.StatusCode == _const.StatusMovedPermanently ||
+			resp.StatusCode == _const.StatusFound ||
+			resp.StatusCode == _const.StatusSeeOther ||
+			resp.StatusCode == _const.StatusNotModified ||
+			resp.StatusCode == _const.StatusUseProxy ||
+			resp.StatusCode == _const.StatusPermanentRedirect {
+			u, err = resp.Location()
 			if err != nil {
 				err = errors.Wrap(err, "crawler: response header 'location' value is not valid")
 				return
@@ -130,9 +140,9 @@ func (c *client) Crawler(ctx context.Context, referredPage *model.Page, targetUr
 		return
 	}
 
-	switch checkContentType(c.browser.ResponseHeaders()) {
+	switch checkContentType(resp.Header) {
 	case model.ContentTypeHTML:
-		if p, ps, err := ParseHTML(c.crawlingVersion, u, c.browser.Dom()); err != nil {
+		if p, ps, err := ParseHTML(c.crawlingVersion, resp.Request.URL, resp.Body); err != nil {
 			log.Error().Err(err).Send()
 		} else {
 			page, err := Save(ctx, txClient, p, ps)
