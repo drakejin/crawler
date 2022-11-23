@@ -24,8 +24,8 @@ func main() {
 	storageDB := storagedb.New(sql, true)
 	storageDB.Client()
 
-	c := crawler.New(storageDB.Client(), 10, "20221121_2208")
+	c := crawler.New(storageDB.Client(), 10, "20221121_2230")
 
-	c.Crawler(context.Background(), nil, "https://9gag.com/trending")
+	c.Crawler(context.Background(), nil, "https://www.reddit.com/r/aww/top/?t=all")
 	// c.Crawler(ctx, "", "https://www.hostinger.com/tutorials/uri-vs-url")
 }

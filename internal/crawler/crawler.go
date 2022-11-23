@@ -3,14 +3,15 @@ package crawler
 import (
 	"context"
 	nativesql "database/sql"
+	"net/http"
+	"net/url"
+	"time"
+
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/motemen/go-loghttp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"net/http"
-	"net/url"
-	"time"
 
 	"github.com/drakejin/crawler/internal/_const"
 	"github.com/drakejin/crawler/internal/model"
@@ -31,16 +32,22 @@ type client struct {
 }
 
 func New(storageDB *ent.Client, maximumConcurrency int, crawlingVersion string) *client {
+	tp := &loghttp.Transport{
+		LogRequest: func(req *http.Request) {
+			log.Debug().Interface("header", req.Header).Msgf("[request] %s %s", req.Method, req.URL)
+		},
+		LogResponse: func(resp *http.Response) {
+			log.Debug().Interface("header", resp.Header).Msgf("[response] %d %s", resp.StatusCode, resp.Request.URL)
+		},
+	}
+	//tp := &http.Transport{}
+	//err := http2.ConfigureTransport(tp)
+	//if err != nil {
+	//	panic(err)
+	//}
 	return &client{
 		client: &http.Client{
-			Transport: &loghttp.Transport{
-				LogRequest: func(req *http.Request) {
-					log.Debug().Interface("header", req.Header).Msgf("[request] %s %s", req.Method, req.URL)
-				},
-				LogResponse: func(resp *http.Response) {
-					log.Debug().Interface("header", resp.Header).Msgf("[response] %d %s", resp.StatusCode, resp.Request.URL)
-				},
-			},
+			Transport: tp,
 		},
 		storageDB:          storageDB,
 		maximumConcurrency: maximumConcurrency,
@@ -57,6 +64,12 @@ var (
 	ErrURLSizeOverMaximum        = errors.New("crawler: url length is over maximum size")
 	MaximumContentLength   int64 = 1024 * 1024 // 1mb
 )
+
+var userAgentMap = map[string]string{
+	"9gag.com": "APIs-Google (+https://developers.google.com/webmasters/APIs-Google.html)",
+
+	"www.reddit.com": "PostmanRuntime/7.29.0",
+}
 
 func (c *client) Crawler(ctx context.Context, referredPage *model.Page, targetUrl string) {
 	// 해당 페이지가 탐색할만한 페이지인지 확인하기 로직
@@ -108,7 +121,14 @@ func (c *client) Crawler(ctx context.Context, referredPage *model.Page, targetUr
 		nil,
 	)
 	// https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers 의 userAgent를 활용하자.
-	req.Header.Set(_const.HeaderUserAgent, "APIs-Google (+https://developers.google.com/webmasters/APIs-Google.html)")
+	if ua, ok := userAgentMap[u.Host]; ok {
+		req.Header.Set(_const.HeaderUserAgent, ua)
+		req.Header.Set(_const.HeaderAccept, "*/*")
+		req.Header.Set(_const.HeaderConnection, "keep-alive")
+		req.Header.Set(_const.HeaderAcceptEncoding, "gzip, deflate, br")
+	} else {
+		req.Header.Set(_const.HeaderUserAgent, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36")
+	}
 	if err != nil {
 		log.Warn().Err(err).Send()
 		return
@@ -191,6 +211,13 @@ func AddReferredIfNotExist(ctx context.Context, tx *ent.Client, referredPage, pa
 	}
 
 	err = tx.PageReferred.Create().
+		SetID(uuid.New()).
+		SetSourceID(referredPage.ID).
+		SetTargetID(page.ID).
+		SetCreatedBy("crawler").
+		SetCreatedAt(time.Now().In(time.UTC)).
+		SetUpdatedBy("crawler").
+		SetUpdatedAt(time.Now().In(time.UTC)).
 		OnConflict(
 			sql.ResolveWith(func(set *sql.UpdateSet) {
 				set.Set("id", uuid.New())
@@ -202,8 +229,6 @@ func AddReferredIfNotExist(ctx context.Context, tx *ent.Client, referredPage, pa
 				),
 			),
 		).
-		SetSourceID(referredPage.ID).
-		SetTargetID(page.ID).
 		Exec(ctx)
 	if err != nil {
 		return err

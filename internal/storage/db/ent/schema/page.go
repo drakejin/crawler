@@ -25,7 +25,11 @@ type Page struct {
 func (Page) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("id", uuid.UUID{}).Unique(),
-		field.String("crawling_version"),
+		field.String("crawling_version").
+			Annotations(entsql.Annotation{
+				Size: 100,
+			}).
+			Comment("version about crawling"),
 
 		field.String("domain").
 			Annotations(entsql.Annotation{
@@ -48,7 +52,7 @@ func (Page) Fields() []ent.Field {
 
 		field.String("url").
 			Annotations(entsql.Annotation{
-				Size: 750,
+				Size: 650,
 			}).
 			NotEmpty().
 			Validate(validate.MaxRuneCount(1200)).
@@ -243,7 +247,7 @@ func (Page) Edges() []ent.Edge {
 func (Page) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("url").StorageKey("ux_url").Unique(),
-		index.Fields("crawling_version").StorageKey("ux_url_and_crawling_version").Unique(),
+		index.Fields("url", "crawling_version").StorageKey("ux_url_and_crawling_version").Unique(),
 	}
 }
 

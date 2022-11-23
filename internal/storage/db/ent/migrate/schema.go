@@ -12,11 +12,11 @@ var (
 	// PageColumns holds the columns for the "page" table.
 	PageColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID, Unique: true},
-		{Name: "crawling_version", Type: field.TypeString},
+		{Name: "crawling_version", Type: field.TypeString, Size: 100},
 		{Name: "domain", Type: field.TypeString, Size: 700},
 		{Name: "port", Type: field.TypeString, Size: 30, Default: "80"},
 		{Name: "is_https", Type: field.TypeBool, Default: false},
-		{Name: "url", Type: field.TypeString, Size: 750},
+		{Name: "url", Type: field.TypeString, Size: 650},
 		{Name: "path", Type: field.TypeString, Size: 1000, Default: ""},
 		{Name: "querystring", Type: field.TypeString, Size: 2147483647, Default: "", SchemaType: map[string]string{"mysql": "text"}},
 		{Name: "count_referred", Type: field.TypeInt64, Default: 0},
@@ -67,7 +67,7 @@ var (
 			{
 				Name:    "ux_url_and_crawling_version",
 				Unique:  true,
-				Columns: []*schema.Column{PageColumns[1]},
+				Columns: []*schema.Column{PageColumns[5], PageColumns[1]},
 			},
 		},
 	}

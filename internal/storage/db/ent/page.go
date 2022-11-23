@@ -17,7 +17,7 @@ type Page struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID uuid.UUID `json:"id,omitempty"`
-	// CrawlingVersion holds the value of the "crawling_version" field.
+	// version about crawling
 	CrawlingVersion string `json:"crawling_version,omitempty"`
 	// domain www.example.com
 	Domain string `json:"domain,omitempty"`

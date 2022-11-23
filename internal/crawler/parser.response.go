@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 
 	"github.com/drakejin/crawler/internal/_const"
 	"github.com/drakejin/crawler/internal/model"
@@ -64,10 +66,7 @@ func ParseHTML(crawlingVersion string, originUrl *url.URL, body io.ReadCloser) (
 	p.Querystring = originUrl.Query().Encode()
 	p.URL = originUrl.String()
 
-	copyUrl, _ := url.Parse(originUrl.String())
-	copyUrl.RawQuery = ""
-
-	p.Links = ParseHTMLLinks(copyUrl, doc.Find("body"))
+	p.Links = ParseHTMLLinks(originUrl, doc.Find("body"))
 
 	ps := &model.PageSource{
 		ID:     uuid.New(),
@@ -80,41 +79,36 @@ func ParseHTMLLinks(originUrl *url.URL, bodyDom *goquery.Selection) []string {
 	var r []string
 	bodyDom.Find("a[href]").Each(func(_ int, aTag *goquery.Selection) {
 		if v, ok := aTag.Attr("href"); ok {
-			strLength := len([]rune(v))
-			if strings.Contains(v, "http") && strLength < 1000 {
-				r = append(r, v)
+			if len(v) > 750 || v == "" || v == "/" || v == originUrl.String() {
 				return
 			}
 
-			//// FIXME: 대충 짜본거.. 테스트 코드들이 필요함. url들이 이뻐야함.
-			//// filepath package를 이용해서.. 상대경로 코드들은 .. 다.. 치환해버리기
-			//if -1 < strings.Index(v, "/") && strings.Index(v, "/") < 3 {
-			//	relativePath := []rune(v)
-			//	startThreeRunesString := string(relativePath[:3])
-			//	startDoubleRunesString := string(relativePath[:2])
-			//	startRuneString := string(relativePath[:1])
-			//	if startThreeRunesString == "../" {
-			//		r = append(r, fmt.Sprintf("%s/%s", originUrl.String(), v))
-			//		return
-			//	}
-			//	if startDoubleRunesString == ".." {
-			//		r = append(r, fmt.Sprintf("%s/%s", originUrl.String(), v))
-			//		return
-			//	} else if startDoubleRunesString == "//" {
-			//		r = append(r, fmt.Sprintf("%s:%s", originUrl.Scheme, v))
-			//		return
-			//	} else if startDoubleRunesString == "./" {
-			//		r = append(r, fmt.Sprintf("%s/%s", originUrl.String(), string(relativePath[2:])))
-			//		return
-			//	}
-			//
-			//	if startRuneString == "/" {
-			//		r = append(r, fmt.Sprintf("%s/%s", originUrl.String(), v))
-			//		return
-			//	}
-			//}
+			// 상대경로 친구들
+			if strings.Index(v, "//") == 0 {
+				r = append(r, fmt.Sprintf("%s:%s", originUrl.Scheme, v))
+				return
+			} else if strings.Index(v, "/") == 2 {
+				joinedUrl, _ := url.JoinPath(originUrl.String(), "../", v)
+				r = append(r, joinedUrl)
+				return
+			} else if strings.Index(v, "/") == 1 {
+				joinedUrl, _ := url.JoinPath(originUrl.String(), "../", v)
+				r = append(r, joinedUrl)
+				return
+			} else if strings.Index(v, "/") == 0 {
+				joinedUrl, _ := url.JoinPath(originUrl.String(), "../", v)
+				r = append(r, joinedUrl)
+				return
+			}
+
+			if strings.Contains(v, originUrl.Host) {
+				r = append(r, v)
+				return
+			}
 		}
+		return
 	})
+	log.Debug().Strs("links", r).Send()
 	return r
 }
 
